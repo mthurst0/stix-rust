@@ -70,6 +70,8 @@ impl Version {
                 let v: u64 = rng.gen();
                 return v.to_string();
             }
+            // TODO: the taxiistand example server uses what looks like a numeric representation
+            // of a UUID. Should we?
             Version::V11 => {
                 let id = Uuid::new_v4();
                 return id.to_string();

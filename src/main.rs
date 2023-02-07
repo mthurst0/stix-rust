@@ -1,3 +1,8 @@
+#![allow(dead_code)]
+#![allow(unused_variables)]
+
+// TODO: remove the above once we get more stable
+
 pub mod taxii;
 
 fn main() {

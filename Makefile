@@ -1,7 +1,9 @@
 .PHONY: check \
 	build \
 	release \
-	run
+	run \
+	test \
+	docs
 
 all: check build
 
@@ -16,6 +18,9 @@ release:
 
 run:
 	cargo test && cargo build && cargo run
+
+test:
+	cargo test
 
 docs:
 	cargo doc --open

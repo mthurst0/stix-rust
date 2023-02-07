@@ -235,80 +235,15 @@ pub fn parse_discovery_response(doc: &[u8]) -> Result<ServiceSet, MyError> {
 
 #[cfg(test)]
 mod tests {
+    use std::{env, fs::read_to_string, path::Path};
+
     use crate::taxii::services::{parse_discovery_response, ServiceType};
 
     #[test]
     fn test_parse_discovery_response() {
-        let doc = r###"
-<taxii_11:Discovery_Response xmlns:taxii="http://taxii.mitre.org/messages/taxii_xml_binding-1" xmlns:taxii_11="http://taxii.mitre.org/messages/taxii_xml_binding-1.1" xmlns:tdq="http://taxii.mitre.org/query/taxii_default_query-1" message_id="4973304169178633585" in_response_to="32cacab7-bdd1-41d1-b5b1-02e3491fe9e8">
-<taxii_11:Service_Instance service_type="INBOX" service_version="urn:taxii.mitre.org:services:1.1" available="true">
-    <taxii_11:Protocol_Binding>urn:taxii.mitre.org:protocol:https:1.0</taxii_11:Protocol_Binding>
-    <taxii_11:Address>https://test.taxiistand.com/read-write/services/inbox-all</taxii_11:Address>
-    <taxii_11:Message_Binding>urn:taxii.mitre.org:message:xml:1.0</taxii_11:Message_Binding>
-    <taxii_11:Message_Binding>urn:taxii.mitre.org:message:xml:1.1</taxii_11:Message_Binding>
-    <taxii_11:Message>Test inbox, accepting all content.</taxii_11:Message>
-</taxii_11:Service_Instance>
-<taxii_11:Service_Instance service_type="INBOX" service_version="urn:taxii.mitre.org:services:1.1" available="true">
-    <taxii_11:Protocol_Binding>urn:taxii.mitre.org:protocol:https:1.0</taxii_11:Protocol_Binding>
-    <taxii_11:Address>https://test.taxiistand.com/read-write/services/inbox-stix</taxii_11:Address>
-    <taxii_11:Message_Binding>urn:taxii.mitre.org:message:xml:1.0</taxii_11:Message_Binding>
-    <taxii_11:Message_Binding>urn:taxii.mitre.org:message:xml:1.1</taxii_11:Message_Binding>
-    <taxii_11:Content_Binding binding_id="urn:stix.mitre.org:xml:1.0"/>
-    <taxii_11:Content_Binding binding_id="urn:stix.mitre.org:xml:1.0.1"/>
-    <taxii_11:Content_Binding binding_id="urn:stix.mitre.org:xml:1.1"/>
-    <taxii_11:Content_Binding binding_id="urn:stix.mitre.org:xml:1.1.1"/>
-    <taxii_11:Content_Binding binding_id="urn:stix.mitre.org:xml:1.2"/>
-    <taxii_11:Message>Test inbox, accepting only STIX documents.</taxii_11:Message>
-</taxii_11:Service_Instance>
-<taxii_11:Service_Instance service_type="INBOX" service_version="urn:taxii.mitre.org:services:1.1" available="true">
-    <taxii_11:Protocol_Binding>urn:taxii.mitre.org:protocol:https:1.0</taxii_11:Protocol_Binding>
-    <taxii_11:Address>https://test.taxiistand.com/read-write/services/inbox-cap</taxii_11:Address>
-    <taxii_11:Message_Binding>urn:taxii.mitre.org:message:xml:1.0</taxii_11:Message_Binding>
-    <taxii_11:Message_Binding>urn:taxii.mitre.org:message:xml:1.1</taxii_11:Message_Binding>
-    <taxii_11:Content_Binding binding_id="urn:oasis:names:tc:emergency:cap:1.1"/>
-    <taxii_11:Content_Binding binding_id="urn:oasis:names:tc:emergency:cap:1.2"/>
-    <taxii_11:Message>Test inbox, accepting only CAP documents.</taxii_11:Message>
-</taxii_11:Service_Instance>
-<taxii_11:Service_Instance service_type="INBOX" service_version="urn:taxii.mitre.org:services:1.1" available="true">
-    <taxii_11:Protocol_Binding>urn:taxii.mitre.org:protocol:https:1.0</taxii_11:Protocol_Binding>
-    <taxii_11:Address>https://test.taxiistand.com/read-write/services/inbox-xmlenc</taxii_11:Address>
-    <taxii_11:Message_Binding>urn:taxii.mitre.org:message:xml:1.0</taxii_11:Message_Binding>
-    <taxii_11:Message_Binding>urn:taxii.mitre.org:message:xml:1.1</taxii_11:Message_Binding>
-    <taxii_11:Content_Binding binding_id="http://www.w3.org/2001/04/xmlenc#"/>
-    <taxii_11:Message>Test inbox, accepting only Encrypted XML documents.</taxii_11:Message>
-</taxii_11:Service_Instance>
-<taxii_11:Service_Instance service_type="INBOX" service_version="urn:taxii.mitre.org:services:1.1" available="true">
-    <taxii_11:Protocol_Binding>urn:taxii.mitre.org:protocol:https:1.0</taxii_11:Protocol_Binding>
-    <taxii_11:Address>https://test.taxiistand.com/read-write/services/inbox-pkcs7</taxii_11:Address>
-    <taxii_11:Message_Binding>urn:taxii.mitre.org:message:xml:1.0</taxii_11:Message_Binding>
-    <taxii_11:Message_Binding>urn:taxii.mitre.org:message:xml:1.1</taxii_11:Message_Binding>
-    <taxii_11:Content_Binding binding_id="application/pkcs7-mime"/>
-    <taxii_11:Message>Test inbox, accepting only S/MIME documents.</taxii_11:Message>
-</taxii_11:Service_Instance>
-<taxii_11:Service_Instance service_type="POLL" service_version="urn:taxii.mitre.org:services:1.1" available="true">
-    <taxii_11:Protocol_Binding >urn:taxii.mitre.org:protocol:https:1.0</taxii_11:Protocol_Binding>
-    <taxii_11:Address>https://test.taxiistand.com/read-write/services/poll</taxii_11:Address>
-    <taxii_11:Message_Binding>urn:taxii.mitre.org:message:xml:1.0</taxii_11:Message_Binding>
-    <taxii_11:Message_Binding>urn:taxii.mitre.org:message:xml:1.1</taxii_11:Message_Binding>
-    <taxii_11:Message>Test poll service, used for all feeds.</taxii_11:Message>
-</taxii_11:Service_Instance>
-<taxii_11:Service_Instance service_type="COLLECTION_MANAGEMENT" service_version="urn:taxii.mitre.org:services:1.1" available="true">
-    <taxii_11:Protocol_Binding>urn:taxii.mitre.org:protocol:https:1.0</taxii_11:Protocol_Binding>
-    <taxii_11:Address>https://test.taxiistand.com/read-write/services/collection-management</taxii_11:Address>
-    <taxii_11:Message_Binding>urn:taxii.mitre.org:message:xml:1.0</taxii_11:Message_Binding>
-    <taxii_11:Message_Binding>urn:taxii.mitre.org:message:xml:1.1</taxii_11:Message_Binding>
-    <taxii_11:Message>Test collection managment service.</taxii_11:Message>
-</taxii_11:Service_Instance>
-<taxii_11:Service_Instance service_type="DISCOVERY" service_version="urn:taxii.mitre.org:services:1.1" available="true">
-    <taxii_11:Protocol_Binding>urn:taxii.mitre.org:protocol:https:1.0</taxii_11:Protocol_Binding>
-    <taxii_11:Address>https://test.taxiistand.com/read-write/services/discovery</taxii_11:Address>
-    <taxii_11:Message_Binding>urn:taxii.mitre.org:message:xml:1.0</taxii_11:Message_Binding>
-    <taxii_11:Message_Binding>urn:taxii.mitre.org:message:xml:1.1</taxii_11:Message_Binding>
-    <taxii_11:Message>Test discovery service.</taxii_11:Message>
-</taxii_11:Service_Instance>
-</taxii_11:Discovery_Response>
-    "###;
-
+        let path = env::var("CARGO_MANIFEST_DIR").unwrap();
+        let path = Path::new(path.as_str()).join("test/sample-discovery-response.xml");
+        let doc = read_to_string(path).unwrap();
         let services = parse_discovery_response(doc.as_bytes()).unwrap();
         assert_eq!(8, services.services.len());
         assert_eq!(ServiceType::Inbox, services.services[0].service_type);
