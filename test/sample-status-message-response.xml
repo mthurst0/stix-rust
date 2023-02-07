@@ -1,0 +1,3 @@
+<taxii_11:Status_Message xmlns:taxii="http://taxii.mitre.org/messages/taxii_xml_binding-1" xmlns:taxii_11="http://taxii.mitre.org/messages/taxii_xml_binding-1.1" xmlns:tdq="http://taxii.mitre.org/query/taxii_default_query-1" message_id="9125177396285394141" in_response_to="0" status_type="BAD_MESSAGE">
+  <taxii_11:Message>Request was invalid XML</taxii_11:Message>
+</taxii_11:Status_Message>

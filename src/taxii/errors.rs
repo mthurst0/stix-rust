@@ -1,5 +1,5 @@
 #[derive(Debug)]
-pub struct MyError(String);
+pub struct MyError(pub String);
 
 impl std::fmt::Display for MyError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {

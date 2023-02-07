@@ -3,8 +3,9 @@ use reqwest;
 use uuid::Uuid;
 use xml::writer::{EmitterConfig, XmlEvent};
 
-use crate::MyError;
+use super::errors::MyError;
 
+#[derive(Copy, Clone, Debug, PartialEq)]
 pub enum Version {
     V10,
     V11,
@@ -76,48 +77,58 @@ impl Version {
             _ => panic!("TODO: does V21 use message IDs?"),
         }
     }
-    pub fn create_discovery_request_body(&self) -> Result<String, MyError> {
-        let mut buf_writer: Vec<u8> = Vec::with_capacity(128);
-        let mut writer = EmitterConfig::new()
-            .write_document_declaration(false)
-            .perform_indent(true)
-            .create_writer(&mut buf_writer);
-        // TODO: Version11 hardcode
-        let msg_id = Version::V11.message_id();
-        let elem = XmlEvent::start_element("taxii_11:Discovery_Request")
-            .attr("message_id", msg_id.as_str())
-            .ns("taxii_11", Version::V11.xml_namespace());
-        match writer.write(elem) {
-            Ok(_) => (),
-            Err(err) => return Err(MyError(err.to_string())),
-        }
-        let end_elem = XmlEvent::end_element();
-        match writer.write(end_elem) {
-            Ok(_) => (),
-            Err(err) => return Err(MyError(err.to_string())),
-        }
-        // TODO: better check on conversion
-        return Ok(String::from_utf8(buf_writer).unwrap());
+}
+
+pub fn create_request_body(tag: &str, ver: Version) -> Result<String, MyError> {
+    let mut buf_writer: Vec<u8> = Vec::with_capacity(128);
+    let mut writer = EmitterConfig::new()
+        .write_document_declaration(false)
+        .perform_indent(true)
+        .create_writer(&mut buf_writer);
+    let msg_id = ver.message_id();
+    let tag = format!("taxii_11:{}", tag);
+    let elem = XmlEvent::start_element(tag.as_str())
+        .attr("message_id", msg_id.as_str())
+        .ns("taxii_11", ver.xml_namespace());
+    match writer.write(elem) {
+        Ok(_) => (),
+        Err(err) => return Err(MyError(err.to_string())),
     }
+    let end_elem = XmlEvent::end_element();
+    match writer.write(end_elem) {
+        Ok(_) => (),
+        Err(err) => return Err(MyError(err.to_string())),
+    }
+    // TODO: better check on conversion than unwrap
+    return Ok(String::from_utf8(buf_writer).unwrap());
+}
+
+pub fn create_discovery_request_body(ver: Version) -> Result<String, MyError> {
+    create_request_body("Discovery_Request", ver)
+}
+
+pub fn create_collection_information_request_body(ver: Version) -> Result<String, MyError> {
+    create_request_body("Collection_Information_Request", ver)
 }
 
 // TODO: the generic XML document defclaration fails when talking to test.taxiistand.com -- is
 // that the typical behaviour for other TAXII servers?
 
-pub fn discover_version_11() {
-    let ver = Version::V11;
+pub fn taxii_request(
+    url: &str,
+    username: &str,
+    password: &str,
+    request_body: &String,
+    ver: Version,
+) {
+    println!("request_body: {}", request_body);
     let client = reqwest::blocking::Client::new();
-    let request_body = match ver.create_discovery_request_body() {
-        Ok(v) => v,
-        Err(err) => panic!("{}", err),
-    };
-    println!("req={}", request_body); // TODO
     let xml_binding_urn = ver.xml_binding_urn();
-    // TODO: hardcoded URL
     let request = match client
-        .post("https://test.taxiistand.com/read-write/services/discovery")
-        .basic_auth("guest", Some("guest"))
-        .body(request_body)
+        .post(url)
+        .basic_auth(username, Some(password))
+        // TODO: unnecessary clone - remain befuddled by lifetimes
+        .body(request_body.clone())
         .header("Accept", ver.content_type())
         .header("Content-Type", ver.content_type())
         .header("X-TAXII-Accept", xml_binding_urn)
@@ -139,4 +150,19 @@ pub fn discover_version_11() {
         }
         Err(err) => panic!("{}", err),
     }
+}
+
+pub fn discovery_request(url: &str, username: &str, password: &str, ver: Version) {
+    match create_discovery_request_body(ver) {
+        Ok(v) => taxii_request(url, username, password, &v, ver),
+        Err(err) => panic!("{}", err),
+    };
+}
+
+// TODO: the request mechanism doesn't really belong in the "version" namespace
+pub fn collection_information_request(url: &str, username: &str, password: &str, ver: Version) {
+    match create_collection_information_request_body(ver) {
+        Ok(v) => taxii_request(url, username, password, &v, ver),
+        Err(err) => panic!("{}", err),
+    };
 }

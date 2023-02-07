@@ -1,0 +1,229 @@
+<taxii_11:Collection_Information_Response xmlns:taxii="http://taxii.mitre.org/messages/taxii_xml_binding-1" xmlns:taxii_11="http://taxii.mitre.org/messages/taxii_xml_binding-1.1" xmlns:tdq="http://taxii.mitre.org/query/taxii_default_query-1" message_id="4977707537013018794" in_response_to="10f77718-85c3-42af-9120-90801c3ec060">
+  <taxii_11:Collection collection_name="any-data" collection_type="DATA_FEED" available="true">
+    <taxii_11:Description>This feed can contain/accept any data, with any binding, removed daily.</taxii_11:Description>
+    <taxii_11:Collection_Volume>38217521</taxii_11:Collection_Volume>
+    <taxii_11:Polling_Service>
+      <taxii_11:Protocol_Binding>urn:taxii.mitre.org:protocol:https:1.0</taxii_11:Protocol_Binding>
+      <taxii_11:Address>https://test.taxiistand.com/read-write/services/poll</taxii_11:Address>
+      <taxii_11:Message_Binding>urn:taxii.mitre.org:message:xml:1.0</taxii_11:Message_Binding>
+      <taxii_11:Message_Binding>urn:taxii.mitre.org:message:xml:1.1</taxii_11:Message_Binding>
+    </taxii_11:Polling_Service>
+    <taxii_11:Polling_Service>
+      <taxii_11:Protocol_Binding>urn:taxii.mitre.org:protocol:https:1.0</taxii_11:Protocol_Binding>
+      <taxii_11:Address>https://test.taxiistand.com/read-write-auth/services/poll</taxii_11:Address>
+      <taxii_11:Message_Binding>urn:taxii.mitre.org:message:xml:1.0</taxii_11:Message_Binding>
+      <taxii_11:Message_Binding>urn:taxii.mitre.org:message:xml:1.1</taxii_11:Message_Binding>
+    </taxii_11:Polling_Service>
+    <taxii_11:Subscription_Service>
+      <taxii_11:Protocol_Binding>urn:taxii.mitre.org:protocol:https:1.0</taxii_11:Protocol_Binding>
+      <taxii_11:Address>https://test.taxiistand.com/read-write/services/collection-management</taxii_11:Address>
+      <taxii_11:Message_Binding>urn:taxii.mitre.org:message:xml:1.0</taxii_11:Message_Binding>
+      <taxii_11:Message_Binding>urn:taxii.mitre.org:message:xml:1.1</taxii_11:Message_Binding>
+    </taxii_11:Subscription_Service>
+    <taxii_11:Subscription_Service>
+      <taxii_11:Protocol_Binding>urn:taxii.mitre.org:protocol:https:1.0</taxii_11:Protocol_Binding>
+      <taxii_11:Address>https://test.taxiistand.com/read-write-auth/services/collection-management</taxii_11:Address>
+      <taxii_11:Message_Binding>urn:taxii.mitre.org:message:xml:1.0</taxii_11:Message_Binding>
+      <taxii_11:Message_Binding>urn:taxii.mitre.org:message:xml:1.1</taxii_11:Message_Binding>
+    </taxii_11:Subscription_Service>
+    <taxii_11:Receiving_Inbox_Service>
+      <taxii_11:Protocol_Binding>urn:taxii.mitre.org:protocol:https:1.0</taxii_11:Protocol_Binding>
+      <taxii_11:Address>https://test.taxiistand.com/read-write/services/inbox-all</taxii_11:Address>
+      <taxii_11:Message_Binding>urn:taxii.mitre.org:message:xml:1.0</taxii_11:Message_Binding>
+      <taxii_11:Message_Binding>urn:taxii.mitre.org:message:xml:1.1</taxii_11:Message_Binding>
+    </taxii_11:Receiving_Inbox_Service>
+    <taxii_11:Receiving_Inbox_Service>
+      <taxii_11:Protocol_Binding>urn:taxii.mitre.org:protocol:https:1.0</taxii_11:Protocol_Binding>
+      <taxii_11:Address>https://test.taxiistand.com/read-write-auth/services/inbox-all</taxii_11:Address>
+      <taxii_11:Message_Binding>urn:taxii.mitre.org:message:xml:1.0</taxii_11:Message_Binding>
+      <taxii_11:Message_Binding>urn:taxii.mitre.org:message:xml:1.1</taxii_11:Message_Binding>
+    </taxii_11:Receiving_Inbox_Service>
+  </taxii_11:Collection>
+  <taxii_11:Collection collection_name="stix-data" collection_type="DATA_FEED" available="true">
+    <taxii_11:Description>This feed only contains/accepts STIX data, removed daily.</taxii_11:Description>
+    <taxii_11:Collection_Volume>13624</taxii_11:Collection_Volume>
+    <taxii_11:Content_Binding binding_id="urn:stix.mitre.org:xml:1.0"/>
+    <taxii_11:Content_Binding binding_id="urn:stix.mitre.org:xml:1.0.1"/>
+    <taxii_11:Content_Binding binding_id="urn:stix.mitre.org:xml:1.1"/>
+    <taxii_11:Content_Binding binding_id="urn:stix.mitre.org:xml:1.1.1"/>
+    <taxii_11:Content_Binding binding_id="urn:stix.mitre.org:xml:1.2"/>
+    <taxii_11:Polling_Service>
+      <taxii_11:Protocol_Binding>urn:taxii.mitre.org:protocol:https:1.0</taxii_11:Protocol_Binding>
+      <taxii_11:Address>https://test.taxiistand.com/read-write/services/poll</taxii_11:Address>
+      <taxii_11:Message_Binding>urn:taxii.mitre.org:message:xml:1.0</taxii_11:Message_Binding>
+      <taxii_11:Message_Binding>urn:taxii.mitre.org:message:xml:1.1</taxii_11:Message_Binding>
+    </taxii_11:Polling_Service>
+    <taxii_11:Polling_Service>
+      <taxii_11:Protocol_Binding>urn:taxii.mitre.org:protocol:https:1.0</taxii_11:Protocol_Binding>
+      <taxii_11:Address>https://test.taxiistand.com/read-write-auth/services/poll</taxii_11:Address>
+      <taxii_11:Message_Binding>urn:taxii.mitre.org:message:xml:1.0</taxii_11:Message_Binding>
+      <taxii_11:Message_Binding>urn:taxii.mitre.org:message:xml:1.1</taxii_11:Message_Binding>
+    </taxii_11:Polling_Service>
+    <taxii_11:Subscription_Service>
+      <taxii_11:Protocol_Binding>urn:taxii.mitre.org:protocol:https:1.0</taxii_11:Protocol_Binding>
+      <taxii_11:Address>https://test.taxiistand.com/read-write/services/collection-management</taxii_11:Address>
+      <taxii_11:Message_Binding>urn:taxii.mitre.org:message:xml:1.0</taxii_11:Message_Binding>
+      <taxii_11:Message_Binding>urn:taxii.mitre.org:message:xml:1.1</taxii_11:Message_Binding>
+    </taxii_11:Subscription_Service>
+    <taxii_11:Subscription_Service>
+      <taxii_11:Protocol_Binding>urn:taxii.mitre.org:protocol:https:1.0</taxii_11:Protocol_Binding>
+      <taxii_11:Address>https://test.taxiistand.com/read-write-auth/services/collection-management</taxii_11:Address>
+      <taxii_11:Message_Binding>urn:taxii.mitre.org:message:xml:1.0</taxii_11:Message_Binding>
+      <taxii_11:Message_Binding>urn:taxii.mitre.org:message:xml:1.1</taxii_11:Message_Binding>
+    </taxii_11:Subscription_Service>
+    <taxii_11:Receiving_Inbox_Service>
+      <taxii_11:Protocol_Binding>urn:taxii.mitre.org:protocol:https:1.0</taxii_11:Protocol_Binding>
+      <taxii_11:Address>https://test.taxiistand.com/read-write/services/inbox-stix</taxii_11:Address>
+      <taxii_11:Message_Binding>urn:taxii.mitre.org:message:xml:1.0</taxii_11:Message_Binding>
+      <taxii_11:Message_Binding>urn:taxii.mitre.org:message:xml:1.1</taxii_11:Message_Binding>
+      <taxii_11:Content_Binding binding_id="urn:stix.mitre.org:xml:1.0"/>
+      <taxii_11:Content_Binding binding_id="urn:stix.mitre.org:xml:1.0.1"/>
+      <taxii_11:Content_Binding binding_id="urn:stix.mitre.org:xml:1.1"/>
+      <taxii_11:Content_Binding binding_id="urn:stix.mitre.org:xml:1.1.1"/>
+      <taxii_11:Content_Binding binding_id="urn:stix.mitre.org:xml:1.2"/>
+    </taxii_11:Receiving_Inbox_Service>
+    <taxii_11:Receiving_Inbox_Service>
+      <taxii_11:Protocol_Binding>urn:taxii.mitre.org:protocol:https:1.0</taxii_11:Protocol_Binding>
+      <taxii_11:Address>https://test.taxiistand.com/read-write-auth/services/inbox-stix</taxii_11:Address>
+      <taxii_11:Message_Binding>urn:taxii.mitre.org:message:xml:1.0</taxii_11:Message_Binding>
+      <taxii_11:Message_Binding>urn:taxii.mitre.org:message:xml:1.1</taxii_11:Message_Binding>
+      <taxii_11:Content_Binding binding_id="urn:stix.mitre.org:xml:1.0"/>
+      <taxii_11:Content_Binding binding_id="urn:stix.mitre.org:xml:1.0.1"/>
+      <taxii_11:Content_Binding binding_id="urn:stix.mitre.org:xml:1.1"/>
+      <taxii_11:Content_Binding binding_id="urn:stix.mitre.org:xml:1.1.1"/>
+      <taxii_11:Content_Binding binding_id="urn:stix.mitre.org:xml:1.2"/>
+    </taxii_11:Receiving_Inbox_Service>
+  </taxii_11:Collection>
+  <taxii_11:Collection collection_name="cap-data" collection_type="DATA_FEED" available="true">
+    <taxii_11:Description>This feed only contains/accepts CAP data, removed daily.</taxii_11:Description>
+    <taxii_11:Collection_Volume>139</taxii_11:Collection_Volume>
+    <taxii_11:Content_Binding binding_id="urn:oasis:names:tc:emergency:cap:1.1"/>
+    <taxii_11:Content_Binding binding_id="urn:oasis:names:tc:emergency:cap:1.2"/>
+    <taxii_11:Polling_Service>
+      <taxii_11:Protocol_Binding>urn:taxii.mitre.org:protocol:https:1.0</taxii_11:Protocol_Binding>
+      <taxii_11:Address>https://test.taxiistand.com/read-write/services/poll</taxii_11:Address>
+      <taxii_11:Message_Binding>urn:taxii.mitre.org:message:xml:1.0</taxii_11:Message_Binding>
+      <taxii_11:Message_Binding>urn:taxii.mitre.org:message:xml:1.1</taxii_11:Message_Binding>
+    </taxii_11:Polling_Service>
+    <taxii_11:Polling_Service>
+      <taxii_11:Protocol_Binding>urn:taxii.mitre.org:protocol:https:1.0</taxii_11:Protocol_Binding>
+      <taxii_11:Address>https://test.taxiistand.com/read-write-auth/services/poll</taxii_11:Address>
+      <taxii_11:Message_Binding>urn:taxii.mitre.org:message:xml:1.0</taxii_11:Message_Binding>
+      <taxii_11:Message_Binding>urn:taxii.mitre.org:message:xml:1.1</taxii_11:Message_Binding>
+    </taxii_11:Polling_Service>
+    <taxii_11:Subscription_Service>
+      <taxii_11:Protocol_Binding>urn:taxii.mitre.org:protocol:https:1.0</taxii_11:Protocol_Binding>
+      <taxii_11:Address>https://test.taxiistand.com/read-write/services/collection-management</taxii_11:Address>
+      <taxii_11:Message_Binding>urn:taxii.mitre.org:message:xml:1.0</taxii_11:Message_Binding>
+      <taxii_11:Message_Binding>urn:taxii.mitre.org:message:xml:1.1</taxii_11:Message_Binding>
+    </taxii_11:Subscription_Service>
+    <taxii_11:Subscription_Service>
+      <taxii_11:Protocol_Binding>urn:taxii.mitre.org:protocol:https:1.0</taxii_11:Protocol_Binding>
+      <taxii_11:Address>https://test.taxiistand.com/read-write-auth/services/collection-management</taxii_11:Address>
+      <taxii_11:Message_Binding>urn:taxii.mitre.org:message:xml:1.0</taxii_11:Message_Binding>
+      <taxii_11:Message_Binding>urn:taxii.mitre.org:message:xml:1.1</taxii_11:Message_Binding>
+    </taxii_11:Subscription_Service>
+    <taxii_11:Receiving_Inbox_Service>
+      <taxii_11:Protocol_Binding>urn:taxii.mitre.org:protocol:https:1.0</taxii_11:Protocol_Binding>
+      <taxii_11:Address>https://test.taxiistand.com/read-write/services/inbox-cap</taxii_11:Address>
+      <taxii_11:Message_Binding>urn:taxii.mitre.org:message:xml:1.0</taxii_11:Message_Binding>
+      <taxii_11:Message_Binding>urn:taxii.mitre.org:message:xml:1.1</taxii_11:Message_Binding>
+      <taxii_11:Content_Binding binding_id="urn:oasis:names:tc:emergency:cap:1.1"/>
+      <taxii_11:Content_Binding binding_id="urn:oasis:names:tc:emergency:cap:1.2"/>
+    </taxii_11:Receiving_Inbox_Service>
+    <taxii_11:Receiving_Inbox_Service>
+      <taxii_11:Protocol_Binding>urn:taxii.mitre.org:protocol:https:1.0</taxii_11:Protocol_Binding>
+      <taxii_11:Address>https://test.taxiistand.com/read-write-auth/services/inbox-cap</taxii_11:Address>
+      <taxii_11:Message_Binding>urn:taxii.mitre.org:message:xml:1.0</taxii_11:Message_Binding>
+      <taxii_11:Message_Binding>urn:taxii.mitre.org:message:xml:1.1</taxii_11:Message_Binding>
+      <taxii_11:Content_Binding binding_id="urn:oasis:names:tc:emergency:cap:1.1"/>
+      <taxii_11:Content_Binding binding_id="urn:oasis:names:tc:emergency:cap:1.2"/>
+    </taxii_11:Receiving_Inbox_Service>
+  </taxii_11:Collection>
+  <taxii_11:Collection collection_name="xmlenc-data" collection_type="DATA_FEED" available="true">
+    <taxii_11:Description>This feed only contains/accepts Encrypted XML data, removed daily.</taxii_11:Description>
+    <taxii_11:Collection_Volume>132</taxii_11:Collection_Volume>
+    <taxii_11:Content_Binding binding_id="http://www.w3.org/2001/04/xmlenc#"/>
+    <taxii_11:Polling_Service>
+      <taxii_11:Protocol_Binding>urn:taxii.mitre.org:protocol:https:1.0</taxii_11:Protocol_Binding>
+      <taxii_11:Address>https://test.taxiistand.com/read-write/services/poll</taxii_11:Address>
+      <taxii_11:Message_Binding>urn:taxii.mitre.org:message:xml:1.0</taxii_11:Message_Binding>
+      <taxii_11:Message_Binding>urn:taxii.mitre.org:message:xml:1.1</taxii_11:Message_Binding>
+    </taxii_11:Polling_Service>
+    <taxii_11:Polling_Service>
+      <taxii_11:Protocol_Binding>urn:taxii.mitre.org:protocol:https:1.0</taxii_11:Protocol_Binding>
+      <taxii_11:Address>https://test.taxiistand.com/read-write-auth/services/poll</taxii_11:Address>
+      <taxii_11:Message_Binding>urn:taxii.mitre.org:message:xml:1.0</taxii_11:Message_Binding>
+      <taxii_11:Message_Binding>urn:taxii.mitre.org:message:xml:1.1</taxii_11:Message_Binding>
+    </taxii_11:Polling_Service>
+    <taxii_11:Subscription_Service>
+      <taxii_11:Protocol_Binding>urn:taxii.mitre.org:protocol:https:1.0</taxii_11:Protocol_Binding>
+      <taxii_11:Address>https://test.taxiistand.com/read-write/services/collection-management</taxii_11:Address>
+      <taxii_11:Message_Binding>urn:taxii.mitre.org:message:xml:1.0</taxii_11:Message_Binding>
+      <taxii_11:Message_Binding>urn:taxii.mitre.org:message:xml:1.1</taxii_11:Message_Binding>
+    </taxii_11:Subscription_Service>
+    <taxii_11:Subscription_Service>
+      <taxii_11:Protocol_Binding>urn:taxii.mitre.org:protocol:https:1.0</taxii_11:Protocol_Binding>
+      <taxii_11:Address>https://test.taxiistand.com/read-write-auth/services/collection-management</taxii_11:Address>
+      <taxii_11:Message_Binding>urn:taxii.mitre.org:message:xml:1.0</taxii_11:Message_Binding>
+      <taxii_11:Message_Binding>urn:taxii.mitre.org:message:xml:1.1</taxii_11:Message_Binding>
+    </taxii_11:Subscription_Service>
+    <taxii_11:Receiving_Inbox_Service>
+      <taxii_11:Protocol_Binding>urn:taxii.mitre.org:protocol:https:1.0</taxii_11:Protocol_Binding>
+      <taxii_11:Address>https://test.taxiistand.com/read-write/services/inbox-xmlenc</taxii_11:Address>
+      <taxii_11:Message_Binding>urn:taxii.mitre.org:message:xml:1.0</taxii_11:Message_Binding>
+      <taxii_11:Message_Binding>urn:taxii.mitre.org:message:xml:1.1</taxii_11:Message_Binding>
+      <taxii_11:Content_Binding binding_id="http://www.w3.org/2001/04/xmlenc#"/>
+    </taxii_11:Receiving_Inbox_Service>
+    <taxii_11:Receiving_Inbox_Service>
+      <taxii_11:Protocol_Binding>urn:taxii.mitre.org:protocol:https:1.0</taxii_11:Protocol_Binding>
+      <taxii_11:Address>https://test.taxiistand.com/read-write-auth/services/inbox-xmlenc</taxii_11:Address>
+      <taxii_11:Message_Binding>urn:taxii.mitre.org:message:xml:1.0</taxii_11:Message_Binding>
+      <taxii_11:Message_Binding>urn:taxii.mitre.org:message:xml:1.1</taxii_11:Message_Binding>
+      <taxii_11:Content_Binding binding_id="http://www.w3.org/2001/04/xmlenc#"/>
+    </taxii_11:Receiving_Inbox_Service>
+  </taxii_11:Collection>
+  <taxii_11:Collection collection_name="pkcs7-data" collection_type="DATA_FEED" available="true">
+    <taxii_11:Description>This feed only contains/accpets S/MIME data, removed daily.</taxii_11:Description>
+    <taxii_11:Collection_Volume>134</taxii_11:Collection_Volume>
+    <taxii_11:Content_Binding binding_id="application/pkcs7-mime"/>
+    <taxii_11:Polling_Service>
+      <taxii_11:Protocol_Binding>urn:taxii.mitre.org:protocol:https:1.0</taxii_11:Protocol_Binding>
+      <taxii_11:Address>https://test.taxiistand.com/read-write/services/poll</taxii_11:Address>
+      <taxii_11:Message_Binding>urn:taxii.mitre.org:message:xml:1.0</taxii_11:Message_Binding>
+      <taxii_11:Message_Binding>urn:taxii.mitre.org:message:xml:1.1</taxii_11:Message_Binding>
+    </taxii_11:Polling_Service>
+    <taxii_11:Polling_Service>
+      <taxii_11:Protocol_Binding>urn:taxii.mitre.org:protocol:https:1.0</taxii_11:Protocol_Binding>
+      <taxii_11:Address>https://test.taxiistand.com/read-write-auth/services/poll</taxii_11:Address>
+      <taxii_11:Message_Binding>urn:taxii.mitre.org:message:xml:1.0</taxii_11:Message_Binding>
+      <taxii_11:Message_Binding>urn:taxii.mitre.org:message:xml:1.1</taxii_11:Message_Binding>
+    </taxii_11:Polling_Service>
+    <taxii_11:Subscription_Service>
+      <taxii_11:Protocol_Binding>urn:taxii.mitre.org:protocol:https:1.0</taxii_11:Protocol_Binding>
+      <taxii_11:Address>https://test.taxiistand.com/read-write/services/collection-management</taxii_11:Address>
+      <taxii_11:Message_Binding>urn:taxii.mitre.org:message:xml:1.0</taxii_11:Message_Binding>
+      <taxii_11:Message_Binding>urn:taxii.mitre.org:message:xml:1.1</taxii_11:Message_Binding>
+    </taxii_11:Subscription_Service>
+    <taxii_11:Subscription_Service>
+      <taxii_11:Protocol_Binding>urn:taxii.mitre.org:protocol:https:1.0</taxii_11:Protocol_Binding>
+      <taxii_11:Address>https://test.taxiistand.com/read-write-auth/services/collection-management</taxii_11:Address>
+      <taxii_11:Message_Binding>urn:taxii.mitre.org:message:xml:1.0</taxii_11:Message_Binding>
+      <taxii_11:Message_Binding>urn:taxii.mitre.org:message:xml:1.1</taxii_11:Message_Binding>
+    </taxii_11:Subscription_Service>
+    <taxii_11:Receiving_Inbox_Service>
+      <taxii_11:Protocol_Binding>urn:taxii.mitre.org:protocol:https:1.0</taxii_11:Protocol_Binding>
+      <taxii_11:Address>https://test.taxiistand.com/read-write/services/inbox-pkcs7</taxii_11:Address>
+      <taxii_11:Message_Binding>urn:taxii.mitre.org:message:xml:1.0</taxii_11:Message_Binding>
+      <taxii_11:Message_Binding>urn:taxii.mitre.org:message:xml:1.1</taxii_11:Message_Binding>
+      <taxii_11:Content_Binding binding_id="application/pkcs7-mime"/>
+    </taxii_11:Receiving_Inbox_Service>
+    <taxii_11:Receiving_Inbox_Service>
+      <taxii_11:Protocol_Binding>urn:taxii.mitre.org:protocol:https:1.0</taxii_11:Protocol_Binding>
+      <taxii_11:Address>https://test.taxiistand.com/read-write-auth/services/inbox-pkcs7</taxii_11:Address>
+      <taxii_11:Message_Binding>urn:taxii.mitre.org:message:xml:1.0</taxii_11:Message_Binding>
+      <taxii_11:Message_Binding>urn:taxii.mitre.org:message:xml:1.1</taxii_11:Message_Binding>
+      <taxii_11:Content_Binding binding_id="application/pkcs7-mime"/>
+    </taxii_11:Receiving_Inbox_Service>
+  </taxii_11:Collection>
+</taxii_11:Collection_Information_Response>

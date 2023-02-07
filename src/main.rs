@@ -1,18 +1,17 @@
-// use http::{Request, Response};
 pub mod taxii;
 
-#[derive(Debug)]
-pub struct MyError(String);
-
-impl std::fmt::Display for MyError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self.0)
-    }
-}
-
-impl std::error::Error for MyError {}
-
 fn main() {
-    // taxii::services::test_parse_services();
-    // taxii::version::discover_version_11();
+    let discovery_request_url = "https://test.taxiistand.com/read-write/services/discovery";
+    let collection_information_request_url =
+        "https://test.taxiistand.com/read-write/services/collection-management";
+    let username = "guest";
+    let password = "guest";
+    let ver = taxii::version::Version::V11;
+    // taxii::version::discovery_request(discovery_request_url, username, password, ver);
+    taxii::version::collection_information_request(
+        collection_information_request_url,
+        username,
+        password,
+        ver,
+    );
 }

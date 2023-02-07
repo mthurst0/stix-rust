@@ -1,6 +1,6 @@
 use xml::reader::{EventReader, XmlEvent};
 
-use crate::MyError;
+use super::errors::MyError;
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum ServiceType {
