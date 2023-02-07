@@ -2,6 +2,7 @@
 #![allow(unused_variables)]
 
 // TODO: remove the above once we get more stable
+// TODO: excessive String cloning in message parsing
 
 pub mod taxii;
 

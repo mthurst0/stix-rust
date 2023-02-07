@@ -81,7 +81,7 @@ enum InTag {
 
 pub fn parse_discovery_response(doc: &[u8]) -> Result<ServiceSet, MyError> {
     let mut tag_stack = Vec::<InTag>::new();
-    let mut services = ServiceSet::new();
+    let mut service_set = ServiceSet::new();
     let mut cur_service = ServiceInstance::new_empty();
     let mut last_value: String = String::new();
     let xml_parser = EventReader::new(doc);
@@ -183,7 +183,7 @@ pub fn parse_discovery_response(doc: &[u8]) -> Result<ServiceSet, MyError> {
                     if name.local_name != "Service_Instance" {
                         return Err(MyError(format!("malformed XML response")));
                     }
-                    services.services.push(cur_service.clone());
+                    service_set.services.push(cur_service.clone());
                     cur_service = ServiceInstance::new_empty();
                 }
                 Some(InTag::ProtocolBinding) => {
@@ -230,7 +230,7 @@ pub fn parse_discovery_response(doc: &[u8]) -> Result<ServiceSet, MyError> {
             _ => {}
         }
     }
-    Ok(services)
+    Ok(service_set)
 }
 
 #[cfg(test)]
@@ -244,85 +244,85 @@ mod tests {
         let path = env::var("CARGO_MANIFEST_DIR").unwrap();
         let path = Path::new(path.as_str()).join("test/sample-discovery-response.xml");
         let doc = read_to_string(path).unwrap();
-        let services = parse_discovery_response(doc.as_bytes()).unwrap();
-        assert_eq!(8, services.services.len());
-        assert_eq!(ServiceType::Inbox, services.services[0].service_type);
-        assert_eq!(ServiceType::Inbox, services.services[1].service_type);
-        assert_eq!(ServiceType::Inbox, services.services[2].service_type);
-        assert_eq!(ServiceType::Inbox, services.services[3].service_type);
-        assert_eq!(ServiceType::Inbox, services.services[4].service_type);
-        assert_eq!(ServiceType::Poll, services.services[5].service_type);
+        let service_set = parse_discovery_response(doc.as_bytes()).unwrap();
+        assert_eq!(8, service_set.services.len());
+        assert_eq!(ServiceType::Inbox, service_set.services[0].service_type);
+        assert_eq!(ServiceType::Inbox, service_set.services[1].service_type);
+        assert_eq!(ServiceType::Inbox, service_set.services[2].service_type);
+        assert_eq!(ServiceType::Inbox, service_set.services[3].service_type);
+        assert_eq!(ServiceType::Inbox, service_set.services[4].service_type);
+        assert_eq!(ServiceType::Poll, service_set.services[5].service_type);
         assert_eq!(
             ServiceType::CollectionManagement,
-            services.services[6].service_type
+            service_set.services[6].service_type
         );
-        assert_eq!(ServiceType::Discovery, services.services[7].service_type);
+        assert_eq!(ServiceType::Discovery, service_set.services[7].service_type);
         assert_eq!(
-            services.services[0].address,
+            service_set.services[0].address,
             "https://test.taxiistand.com/read-write/services/inbox-all"
         );
         assert_eq!(
-            services.services[0].message.as_ref().unwrap().as_str(),
+            service_set.services[0].message.as_ref().unwrap().as_str(),
             "Test inbox, accepting all content."
         );
         assert_eq!(
-            services.services[1].address,
+            service_set.services[1].address,
             "https://test.taxiistand.com/read-write/services/inbox-stix"
         );
         assert_eq!(
-            services.services[1].message.as_ref().unwrap().as_str(),
+            service_set.services[1].message.as_ref().unwrap().as_str(),
             "Test inbox, accepting only STIX documents."
         );
         assert_eq!(
-            services.services[2].address,
+            service_set.services[2].address,
             "https://test.taxiistand.com/read-write/services/inbox-cap"
         );
         assert_eq!(
-            services.services[2].message.as_ref().unwrap().as_str(),
+            service_set.services[2].message.as_ref().unwrap().as_str(),
             "Test inbox, accepting only CAP documents."
         );
         assert_eq!(
-            services.services[3].address,
+            service_set.services[3].address,
             "https://test.taxiistand.com/read-write/services/inbox-xmlenc"
         );
         assert_eq!(
-            services.services[3].message.as_ref().unwrap().as_str(),
+            service_set.services[3].message.as_ref().unwrap().as_str(),
             "Test inbox, accepting only Encrypted XML documents."
         );
         assert_eq!(
-            services.services[4].address,
+            service_set.services[4].address,
             "https://test.taxiistand.com/read-write/services/inbox-pkcs7"
         );
         assert_eq!(
-            services.services[4].message.as_ref().unwrap().as_str(),
+            service_set.services[4].message.as_ref().unwrap().as_str(),
             "Test inbox, accepting only S/MIME documents."
         );
         assert_eq!(
-            services.services[5].address,
+            service_set.services[5].address,
             "https://test.taxiistand.com/read-write/services/poll"
         );
         assert_eq!(
-            services.services[5].message.as_ref().unwrap().as_str(),
+            service_set.services[5].message.as_ref().unwrap().as_str(),
             "Test poll service, used for all feeds."
         );
         assert_eq!(
-            services.services[6].address,
+            service_set.services[6].address,
             "https://test.taxiistand.com/read-write/services/collection-management"
         );
         assert_eq!(
-            services.services[6].message.as_ref().unwrap().as_str(),
+            service_set.services[6].message.as_ref().unwrap().as_str(),
             "Test collection managment service."
         );
         assert_eq!(
-            services.services[7].address,
+            service_set.services[7].address,
             "https://test.taxiistand.com/read-write/services/discovery"
         );
         assert_eq!(
-            services.services[7].message.as_ref().unwrap().as_str(),
+            service_set.services[7].message.as_ref().unwrap().as_str(),
             "Test discovery service."
         );
 
-        for service in services.services {
+        for service in service_set.services {
             assert_eq!(service.service_version, "urn:taxii.mitre.org:services:1.1");
             assert!(service.available);
             assert_eq!(
