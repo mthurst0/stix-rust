@@ -9,13 +9,13 @@ check:
 	cargo check
 
 build:
-	cargo build
+	cargo test && cargo build
 
 release:
 	cargo build --release
 
 run:
-	cargo run
+	cargo test && cargo build && cargo run
 
 docs:
 	cargo doc --open

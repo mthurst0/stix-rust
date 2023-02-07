@@ -13,5 +13,6 @@ impl std::fmt::Display for MyError {
 impl std::error::Error for MyError {}
 
 fn main() {
-    taxii::version::discover_version_11();
+    // taxii::services::test_parse_services();
+    // taxii::version::discover_version_11();
 }
