@@ -1,0 +1,3 @@
+<taxii_11:Status_Message xmlns:taxii="http://taxii.mitre.org/messages/taxii_xml_binding-1" xmlns:taxii_11="http://taxii.mitre.org/messages/taxii_xml_binding-1.1" xmlns:tdq="http://taxii.mitre.org/query/taxii_default_query-1" message_id="8684206618161822171" in_response_to="63cc64f6-3b3e-49ce-b479-570bc2345c41" status_type="FAILURE">
+  <taxii_11:Message>Message not supported by this service</taxii_11:Message>
+</taxii_11:Status_Message>

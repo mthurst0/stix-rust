@@ -104,7 +104,8 @@ mod tests {
     #[test]
     fn test_parse_status_message() {
         let path = env::var("CARGO_MANIFEST_DIR").unwrap();
-        let path = Path::new(path.as_str()).join("test/sample-status-message-response.xml");
+        let path =
+            Path::new(path.as_str()).join("test/sample-status-message-response-bad-message.xml");
         let doc = read_to_string(path).unwrap();
         let status_message = parse_status_message(doc.as_bytes()).unwrap();
         assert_eq!("9125177396285394141", status_message.message_id);

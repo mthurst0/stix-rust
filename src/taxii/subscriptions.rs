@@ -2,6 +2,7 @@ use xml::{reader, writer, EventReader};
 
 use super::{
     errors::MyError,
+    types::{ContentBinding, ResponseType},
     version::{taxii_request, write_xml, write_xml_tag_with_data, Version},
 };
 
@@ -34,33 +35,6 @@ impl SubscribeAction {
             SubscribeAction::Status => "STATUS",
         }
     }
-}
-
-#[derive(Debug, Copy, Clone, PartialEq)]
-enum ResponseType {
-    Full,
-    CountOnly,
-}
-
-impl ResponseType {
-    pub fn parse(v: &str) -> Result<ResponseType, MyError> {
-        match v {
-            "FULL" => Ok(ResponseType::Full),
-            "COUNT_ONLY" => Ok(ResponseType::CountOnly),
-            _ => Err(MyError(format!("could not parse response type: {}", v))),
-        }
-    }
-    pub fn to_str(&self) -> &str {
-        match self {
-            ResponseType::Full => "FULL",
-            ResponseType::CountOnly => "COUNT_ONLY",
-        }
-    }
-}
-
-struct ContentBinding {
-    binding_id: String,
-    subtype_id: Option<String>,
 }
 
 struct SubscriptionParameters {
@@ -253,6 +227,27 @@ pub fn unsubscribe_request(
     match create_subscribe_request_body(
         ver,
         SubscribeAction::Unsubscribe,
+        collection_name,
+        Some(subscription_id),
+        None,
+        None,
+    ) {
+        Ok(request_body) => taxii_request(url, username, password, &request_body, ver),
+        Err(err) => panic!("{}", err),
+    }
+}
+
+pub fn status_request(
+    url: &str,
+    username: &str,
+    password: &str,
+    ver: Version,
+    collection_name: &str,
+    subscription_id: &str,
+) {
+    match create_subscribe_request_body(
+        ver,
+        SubscribeAction::Status,
         collection_name,
         Some(subscription_id),
         None,

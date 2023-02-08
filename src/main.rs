@@ -32,14 +32,35 @@ fn main() {
     //     "stix-data",
     // );
 
-    let unsubscribe_request_url =
-        "https://test.taxiistand.com/read-write/services/collection-management";
-    taxii::subscriptions::unsubscribe_request(
-        unsubscribe_request_url,
-        username,
-        password,
-        ver,
-        "stix-data",
-        "8954140241256270840",
-    );
+    // let unsubscribe_request_url =
+    //     "https://test.taxiistand.com/read-write/services/collection-management";
+    // taxii::subscriptions::unsubscribe_request(
+    //     unsubscribe_request_url,
+    //     username,
+    //     password,
+    //     ver,
+    //     "stix-data",
+    //     "7926581390271290794",
+    // );
+
+    // let status_request_url =
+    //     "https://test.taxiistand.com/read-write/services/collection-management";
+    // taxii::subscriptions::status_request(
+    //     status_request_url,
+    //     username,
+    //     password,
+    //     ver,
+    //     "stix-data",
+    //     "7926581390271290794",
+    // );
+
+    // let poll_request_url = "https://test.taxiistand.com/read-write/services/poll";
+    // taxii::poll::poll_request(
+    //     poll_request_url,
+    //     username,
+    //     password,
+    //     ver,
+    //     "stix-data",
+    //     "2326864292141172358",
+    // );
 }

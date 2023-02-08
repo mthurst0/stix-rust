@@ -96,6 +96,7 @@ pub fn write_xml_tag_with_data(
     tag: &str,
     data: &str,
 ) -> Result<(), MyError> {
+    // TODO: escape tag, or test if it has bad characters
     write_xml(writer, XmlEvent::start_element(tag))?;
     write_xml(writer, XmlEvent::characters(data))?;
     write_xml(writer, XmlEvent::end_element())?;
@@ -140,12 +141,15 @@ pub fn create_collection_information_request_body(ver: Version) -> Result<String
 pub fn taxii_request(url: &str, username: &str, password: &str, request_body: &str, ver: Version) {
     let client = reqwest::blocking::Client::new();
     let xml_binding_urn = ver.xml_binding_urn();
+    println!("TODO-request_body={}", request_body);
     let request = match client
         .post(url)
         .basic_auth(username, Some(password))
         .body(String::from(request_body))
         .header("Accept", ver.content_type())
         .header("Content-Type", ver.content_type())
+        // TODO: default and make configurable in the library
+        .header("User-Agent", "github.com/mthurst0/stix-rust")
         .header("X-TAXII-Accept", xml_binding_urn)
         .header("X-TAXII-Content-Type", xml_binding_urn)
         .header("X-TAXII-Protocol", DEFAULT_TAXII_PROTOCOL_URN)
