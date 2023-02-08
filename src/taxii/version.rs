@@ -147,6 +147,26 @@ struct PushParameters {
 
 // TODO: Extended Headers?
 // TODO: <ds:Signature>
+pub fn write_xml<'a, E>(writer: &mut EventWriter<&mut Vec<u8>>, event: E) -> Result<(), MyError>
+where
+    E: Into<XmlEvent<'a>>,
+{
+    match writer.write(event) {
+        Ok(_) => Ok(()),
+        Err(err) => return Err(MyError(err.to_string())),
+    }
+}
+
+pub fn write_xml_tag_with_data(
+    writer: &mut EventWriter<&mut Vec<u8>>,
+    tag: &str,
+    data: &str,
+) -> Result<(), MyError> {
+    write_xml(writer, XmlEvent::start_element(tag))?;
+    write_xml(writer, XmlEvent::characters(data))?;
+    write_xml(writer, XmlEvent::end_element())?;
+    Ok(())
+}
 
 fn create_subscribe_request_body(
     ver: Version,
@@ -169,24 +189,13 @@ fn create_subscribe_request_body(
         .attr("message_id", msg_id.as_str())
         .attr("collection_name", collection_name)
         .ns("taxii_11", ver.xml_namespace());
-    match writer.write(elem) {
-        Ok(_) => (),
-        Err(err) => return Err(MyError(err.to_string())),
-    }
-
+    write_xml(&mut writer, elem)?;
     if action != SubscribeAction::Subscribe && subscription_id.is_some() {
-        match writer.write(XmlEvent::start_element("taxii_11:Subscription_ID")) {
-            Ok(_) => (),
-            Err(err) => return Err(MyError(err.to_string())),
-        }
-        match writer.write(XmlEvent::characters(subscription_id.unwrap())) {
-            Ok(_) => (),
-            Err(err) => return Err(MyError(err.to_string())),
-        }
-        match writer.write(XmlEvent::end_element()) {
-            Ok(_) => (),
-            Err(err) => return Err(MyError(err.to_string())),
-        }
+        write_xml_tag_with_data(
+            &mut writer,
+            "taxii_11:Subscription_ID",
+            subscription_id.unwrap(),
+        )?;
     }
     if action == SubscribeAction::Subscribe && subscription_id.is_some() {
         return Err(MyError(String::from(
@@ -477,6 +486,9 @@ mod tests {
             None,
         );
         let result = result.unwrap();
-        println!("result={}", result);
+        assert!(result.starts_with(
+            "<taxii_11:Subscription_Management_Request xmlns:taxii_11=\"http://taxii.mitre.org/messages/taxii_xml_binding-1.1\" \
+            action=\"SUBSCRIBE\" message_id="));
+        assert!(result.ends_with("collection_name=\"collection-name-1\" />"));
     }
 }
