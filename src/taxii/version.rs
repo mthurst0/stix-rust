@@ -81,73 +81,6 @@ impl Version {
     }
 }
 
-/*
-SUBSCRIBE SUBSCRIBE - Request a subscription to the named TAXII Data Collection
-UNSUBSCRIBE UNSUBSCRIBE - Request cancellation of an existing subscription to the named
-TAXII Data Collection
-PAUSE PAUSE - Suspend delivery of content for the identified subscription
-RESUME RESUME – Resume delivery of content for the identified subscription
-STATUS STATUS - Request information on all subscriptions the requester has established
-for the named TAXII Data Collection.
-*/
-
-#[derive(Debug, Copy, Clone, PartialEq)]
-enum SubscribeAction {
-    Subscribe,
-    Unsubscribe,
-    Pause,
-    Resume,
-    Status,
-}
-
-impl SubscribeAction {
-    pub fn to_str(&self) -> &str {
-        match self {
-            SubscribeAction::Subscribe => "SUBSCRIBE",
-            SubscribeAction::Unsubscribe => "UNSUBSCRIBE",
-            SubscribeAction::Pause => "PAUSE",
-            SubscribeAction::Resume => "RESUME",
-            SubscribeAction::Status => "STATUS",
-        }
-    }
-}
-
-#[derive(Debug, Copy, Clone, PartialEq)]
-enum ResponseType {
-    Full,
-    CountOnly,
-}
-
-impl ResponseType {
-    pub fn to_str(&self) -> &str {
-        match self {
-            ResponseType::Full => "FULL",
-            ResponseType::CountOnly => "COUNT_ONLY",
-        }
-    }
-}
-
-struct ContentBinding {
-    binding_id: String,
-    subtype_id: Option<String>,
-}
-
-struct SubscriptionParameters {
-    reponse_type: ResponseType,
-    content_bindings: Vec<ContentBinding>,
-    query: Option<String>,
-    query_format_id: Option<String>,
-}
-
-struct PushParameters {
-    protocol_binding: String,
-    address: String,
-    message_binding: String,
-}
-
-// TODO: Extended Headers?
-// TODO: <ds:Signature>
-
 pub fn write_xml<'a, E>(writer: &mut EventWriter<&mut Vec<u8>>, event: E) -> Result<(), MyError>
 where
     E: Into<XmlEvent<'a>>,
@@ -167,148 +100,6 @@ pub fn write_xml_tag_with_data(
     write_xml(writer, XmlEvent::characters(data))?;
     write_xml(writer, XmlEvent::end_element())?;
     Ok(())
-}
-
-fn create_subscribe_request_body(
-    ver: Version,
-    action: SubscribeAction,
-    collection_name: &str,
-    subscription_id: Option<&str>,
-    subscription_parameters: Option<&SubscriptionParameters>,
-    push_parameters: Option<&PushParameters>,
-) -> Result<String, MyError> {
-    let mut buf_writer: Vec<u8> = Vec::with_capacity(128);
-    let mut writer = EmitterConfig::new()
-        .write_document_declaration(false)
-        .perform_indent(true)
-        .create_writer(&mut buf_writer);
-
-    let msg_id = ver.message_id();
-    let tag = format!("taxii_11:Subscription_Management_Request");
-    let elem = XmlEvent::start_element(tag.as_str())
-        .attr("action", action.to_str())
-        .attr("message_id", msg_id.as_str())
-        .attr("collection_name", collection_name)
-        .ns("taxii_11", ver.xml_namespace());
-
-    // <Subscription_Management_Request>
-    write_xml(&mut writer, elem)?;
-
-    if action != SubscribeAction::Subscribe && subscription_id.is_some() {
-        // <Subscription_ID></Subscription_ID>
-        write_xml_tag_with_data(
-            &mut writer,
-            "taxii_11:Subscription_ID",
-            subscription_id.unwrap(),
-        )?;
-    }
-    if action == SubscribeAction::Subscribe && subscription_id.is_some() {
-        return Err(MyError(String::from(
-            "unexpected subscription ID provided with subscribe action",
-        )));
-    }
-
-    if action == SubscribeAction::Subscribe && subscription_parameters.is_some() {
-        let subscription_parameters = subscription_parameters.unwrap();
-        // <Subscription_Parameters>
-        write_xml(
-            &mut writer,
-            XmlEvent::start_element("taxii_11:Subscription_Parameters"),
-        )?;
-        // <Response_Type></Response_Type>
-        write_xml_tag_with_data(
-            &mut writer,
-            "taxii_11:Response_Type",
-            subscription_parameters.reponse_type.to_str(),
-        )?;
-        {
-            for content_binding in subscription_parameters.content_bindings.iter() {
-                // <Content_Binding>
-                write_xml(
-                    &mut writer,
-                    XmlEvent::start_element("taxii_11:Content_Binding")
-                        .attr("binding_id", content_binding.binding_id.as_str()),
-                )?;
-                match &content_binding.subtype_id {
-                    Some(subtype_id) => {
-                        write_xml(
-                            &mut writer,
-                            XmlEvent::start_element("taxii_11:Subtype")
-                                .attr("binding_id", &subtype_id.as_str()),
-                        )?;
-                        write_xml(&mut writer, XmlEvent::end_element())?;
-                    }
-                    None => (),
-                }
-                // </Content_Binding>
-                write_xml(&mut writer, XmlEvent::end_element())?;
-            }
-            {
-                match &subscription_parameters.query {
-                    Some(query) => {
-                        // <Query>
-                        match &subscription_parameters.query_format_id {
-                            Some(query_format_id) => {
-                                write_xml(
-                                    &mut writer,
-                                    XmlEvent::start_element("taxii_11:Query")
-                                        .attr("format_id", query_format_id.as_str()),
-                                )?;
-                            }
-                            None => {
-                                write_xml(&mut writer, XmlEvent::start_element("taxii_11:Query"))?
-                            }
-                        }
-                        write_xml(&mut writer, XmlEvent::characters(query.as_str()))?;
-                        // </Query>
-                        write_xml(&mut writer, XmlEvent::end_element())?;
-                    }
-                    None => (),
-                }
-            }
-        }
-        // </Subscription_Parameters>
-        write_xml(&mut writer, XmlEvent::end_element())?;
-    }
-    if action == SubscribeAction::Subscribe && push_parameters.is_some() {
-        let push_parameters = push_parameters.unwrap();
-        // <Push_Parameters>
-        write_xml(
-            &mut writer,
-            XmlEvent::start_element("taxii_11:Push_Parameters"),
-        )?;
-        {
-            // <Protocol_Binding></Protocol_Binding>
-            write_xml_tag_with_data(
-                &mut writer,
-                "taxii_11:Protocol_Binding",
-                &push_parameters.protocol_binding.as_str(),
-            )?;
-        }
-        {
-            // <Address></Address>
-            write_xml_tag_with_data(
-                &mut writer,
-                "taxii_11:Address",
-                &push_parameters.address.as_str(),
-            )?;
-        }
-        {
-            // <Message_Binding></Message_Binding>
-            write_xml_tag_with_data(
-                &mut writer,
-                "taxii_11:Message_Binding",
-                &push_parameters.message_binding.as_str(),
-            )?;
-        }
-        // </Push_Parameters>
-        write_xml(&mut writer, XmlEvent::end_element())?;
-    }
-
-    // </Subscription_Management_Request>
-    write_xml(&mut writer, XmlEvent::end_element())?;
-    // TODO: better check on conversion than unwrap
-    return Ok(String::from_utf8(buf_writer).unwrap());
 }
 
 fn create_simple_request_body(tag: &str, ver: Version) -> Result<String, MyError> {
@@ -346,21 +137,13 @@ pub fn create_collection_information_request_body(ver: Version) -> Result<String
 // TODO: the generic XML document defclaration fails when talking to test.taxiistand.com -- is
 // that the typical behaviour for other TAXII servers?
 
-pub fn taxii_request(
-    url: &str,
-    username: &str,
-    password: &str,
-    request_body: &String,
-    ver: Version,
-) {
-    println!("request_body: {}", request_body);
+pub fn taxii_request(url: &str, username: &str, password: &str, request_body: &str, ver: Version) {
     let client = reqwest::blocking::Client::new();
     let xml_binding_urn = ver.xml_binding_urn();
     let request = match client
         .post(url)
         .basic_auth(username, Some(password))
-        // TODO: unnecessary clone - remain befuddled by lifetimes
-        .body(request_body.clone())
+        .body(String::from(request_body))
         .header("Accept", ver.content_type())
         .header("Content-Type", ver.content_type())
         .header("X-TAXII-Accept", xml_binding_urn)
@@ -386,7 +169,7 @@ pub fn taxii_request(
 
 pub fn discovery_request(url: &str, username: &str, password: &str, ver: Version) {
     match create_discovery_request_body(ver) {
-        Ok(v) => taxii_request(url, username, password, &v, ver),
+        Ok(request_body) => taxii_request(url, username, password, request_body.as_str(), ver),
         Err(err) => panic!("{}", err),
     };
 }
@@ -394,39 +177,7 @@ pub fn discovery_request(url: &str, username: &str, password: &str, ver: Version
 // TODO: the request mechanism doesn't really belong in the "version" namespace
 pub fn collection_information_request(url: &str, username: &str, password: &str, ver: Version) {
     match create_collection_information_request_body(ver) {
-        Ok(v) => taxii_request(url, username, password, &v, ver),
+        Ok(request_body) => taxii_request(url, username, password, request_body.as_str(), ver),
         Err(err) => panic!("{}", err),
     };
-}
-
-#[cfg(test)]
-mod tests {
-    use super::{create_subscribe_request_body, SubscribeAction, Version};
-
-    #[test]
-    fn test_create_subscribe_request_body() {
-        let result = create_subscribe_request_body(
-            Version::V11,
-            SubscribeAction::Subscribe,
-            "collection-name-1",
-            Some("subscription-id-1"),
-            None,
-            None,
-        );
-        assert!(result.is_err());
-
-        let result = create_subscribe_request_body(
-            Version::V11,
-            SubscribeAction::Subscribe,
-            "collection-name-1",
-            None,
-            None,
-            None,
-        );
-        let result = result.unwrap();
-        assert!(result.starts_with(
-            "<taxii_11:Subscription_Management_Request xmlns:taxii_11=\"http://taxii.mitre.org/messages/taxii_xml_binding-1.1\" \
-            action=\"SUBSCRIBE\" message_id="));
-        assert!(result.ends_with("collection_name=\"collection-name-1\" />"));
-    }
 }
