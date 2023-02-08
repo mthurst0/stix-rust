@@ -2,7 +2,7 @@ use xml::reader::{EventReader, XmlEvent};
 
 use super::errors::MyError;
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Copy, Clone, PartialEq)]
 pub enum CollectionType {
     Unknown,
     DataFeed,
@@ -17,7 +17,7 @@ impl CollectionType {
     }
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Copy, Clone, PartialEq)]
 pub enum CollectionServiceType {
     PollingService,
     SubscriptionService,

@@ -1,7 +1,7 @@
 use rand::prelude::*;
 use reqwest;
 use uuid::Uuid;
-use xml::writer::{EmitterConfig, XmlEvent};
+use xml::writer::{EmitterConfig, EventWriter, XmlEvent};
 
 use super::errors::MyError;
 
@@ -81,7 +81,290 @@ impl Version {
     }
 }
 
-pub fn create_request_body(tag: &str, ver: Version) -> Result<String, MyError> {
+/*
+SUBSCRIBE SUBSCRIBE - Request a subscription to the named TAXII Data Collection
+UNSUBSCRIBE UNSUBSCRIBE - Request cancellation of an existing subscription to the named
+TAXII Data Collection
+PAUSE PAUSE - Suspend delivery of content for the identified subscription
+RESUME RESUME – Resume delivery of content for the identified subscription
+STATUS STATUS - Request information on all subscriptions the requester has established
+for the named TAXII Data Collection.
+*/
+
+#[derive(Debug, Copy, Clone, PartialEq)]
+enum SubscribeAction {
+    Subscribe,
+    Unsubscribe,
+    Pause,
+    Resume,
+    Status,
+}
+
+impl SubscribeAction {
+    pub fn to_str(&self) -> &str {
+        match self {
+            SubscribeAction::Subscribe => "SUBSCRIBE",
+            SubscribeAction::Unsubscribe => "UNSUBSCRIBE",
+            SubscribeAction::Pause => "PAUSE",
+            SubscribeAction::Resume => "RESUME",
+            SubscribeAction::Status => "STATUS",
+        }
+    }
+}
+
+#[derive(Debug, Copy, Clone, PartialEq)]
+enum ResponseType {
+    Full,
+    CountOnly,
+}
+
+impl ResponseType {
+    pub fn to_str(&self) -> &str {
+        match self {
+            ResponseType::Full => "FULL",
+            ResponseType::CountOnly => "COUNT_ONLY",
+        }
+    }
+}
+
+struct ContentBinding {
+    binding_id: String,
+    subtype_id: Option<String>,
+}
+
+struct SubscriptionParameters {
+    reponse_type: ResponseType,
+    content_bindings: Vec<ContentBinding>,
+    query: Option<String>,
+    query_format_id: Option<String>,
+}
+
+struct PushParameters {
+    protocol_binding: String,
+    address: String,
+    message_binding: String,
+}
+
+// TODO: Extended Headers?
+// TODO: <ds:Signature>
+
+fn create_subscribe_request_body(
+    ver: Version,
+    action: SubscribeAction,
+    collection_name: &str,
+    subscription_id: Option<&str>,
+    subscription_parameters: Option<&SubscriptionParameters>,
+    push_parameters: Option<&PushParameters>,
+) -> Result<String, MyError> {
+    let mut buf_writer: Vec<u8> = Vec::with_capacity(128);
+    let mut writer = EmitterConfig::new()
+        .write_document_declaration(false)
+        .perform_indent(true)
+        .create_writer(&mut buf_writer);
+
+    let msg_id = ver.message_id();
+    let tag = format!("taxii_11:Subscription_Management_Request");
+    let elem = XmlEvent::start_element(tag.as_str())
+        .attr("action", action.to_str())
+        .attr("message_id", msg_id.as_str())
+        .attr("collection_name", collection_name)
+        .ns("taxii_11", ver.xml_namespace());
+    match writer.write(elem) {
+        Ok(_) => (),
+        Err(err) => return Err(MyError(err.to_string())),
+    }
+
+    if action != SubscribeAction::Subscribe && subscription_id.is_some() {
+        match writer.write(XmlEvent::start_element("taxii_11:Subscription_ID")) {
+            Ok(_) => (),
+            Err(err) => return Err(MyError(err.to_string())),
+        }
+        match writer.write(XmlEvent::characters(subscription_id.unwrap())) {
+            Ok(_) => (),
+            Err(err) => return Err(MyError(err.to_string())),
+        }
+        match writer.write(XmlEvent::end_element()) {
+            Ok(_) => (),
+            Err(err) => return Err(MyError(err.to_string())),
+        }
+    }
+    if action == SubscribeAction::Subscribe && subscription_id.is_some() {
+        return Err(MyError(String::from(
+            "unexpected subscription ID provided with subscribe action",
+        )));
+    }
+
+    if action == SubscribeAction::Subscribe && subscription_parameters.is_some() {
+        let subscription_parameters = subscription_parameters.unwrap();
+        match writer.write(XmlEvent::start_element("taxii_11:Subscription_Parameters")) {
+            Ok(_) => (),
+            Err(err) => return Err(MyError(err.to_string())),
+        }
+        {
+            // <Response_Type>
+            match writer.write(XmlEvent::start_element("taxii_11:Response_Type")) {
+                Ok(_) => (),
+                Err(err) => return Err(MyError(err.to_string())),
+            }
+            match writer.write(XmlEvent::characters(
+                subscription_parameters.reponse_type.to_str(),
+            )) {
+                Ok(_) => (),
+                Err(err) => return Err(MyError(err.to_string())),
+            }
+            // </Response_Type>
+            match writer.write(XmlEvent::end_element()) {
+                Ok(_) => (),
+                Err(err) => return Err(MyError(err.to_string())),
+            }
+        }
+        {
+            for content_binding in subscription_parameters.content_bindings.iter() {
+                // <Content_Binding>
+                match writer.write(
+                    XmlEvent::start_element("taxii_11:Content_Binding")
+                        .attr("binding_id", content_binding.binding_id.as_str()),
+                ) {
+                    Ok(_) => (),
+                    Err(err) => return Err(MyError(err.to_string())),
+                }
+                match &content_binding.subtype_id {
+                    Some(subtype_id) => {
+                        match writer.write(
+                            XmlEvent::start_element("taxii_11:Subtype")
+                                .attr("subtype_id", subtype_id.as_str()),
+                        ) {
+                            Ok(_) => (),
+                            Err(err) => return Err(MyError(err.to_string())),
+                        }
+                        match writer.write(XmlEvent::end_element()) {
+                            Ok(_) => (),
+                            Err(err) => return Err(MyError(err.to_string())),
+                        }
+                    }
+                    None => (),
+                }
+                // </Content_Binding>
+                match writer.write(XmlEvent::end_element()) {
+                    Ok(_) => (),
+                    Err(err) => return Err(MyError(err.to_string())),
+                }
+            }
+            {
+                match &subscription_parameters.query {
+                    Some(query) => {
+                        match &subscription_parameters.query_format_id {
+                            Some(query_format_id) => {
+                                match writer.write(
+                                    XmlEvent::start_element("taxii_11:Query")
+                                        .attr("format_id", query_format_id.as_str()),
+                                ) {
+                                    Ok(_) => (),
+                                    Err(err) => return Err(MyError(err.to_string())),
+                                }
+                            }
+                            None => match writer.write(XmlEvent::start_element("taxii_11:Query")) {
+                                Ok(_) => (),
+                                Err(err) => return Err(MyError(err.to_string())),
+                            },
+                        }
+                        match writer.write(XmlEvent::characters(query.as_str())) {
+                            Ok(_) => (),
+                            Err(err) => return Err(MyError(err.to_string())),
+                        }
+                        match writer.write(XmlEvent::end_element()) {
+                            Ok(_) => (),
+                            Err(err) => return Err(MyError(err.to_string())),
+                        }
+                    }
+                    None => (),
+                }
+            }
+        }
+        // </Subscription_Parameters>
+        match writer.write(XmlEvent::end_element()) {
+            Ok(_) => (),
+            Err(err) => return Err(MyError(err.to_string())),
+        }
+    }
+    if action == SubscribeAction::Subscribe && push_parameters.is_some() {
+        let push_parameters = push_parameters.unwrap();
+        // <Push_Parameters>
+        match writer.write(XmlEvent::start_element("taxii_11:Push_Parameters")) {
+            Ok(_) => (),
+            Err(err) => return Err(MyError(err.to_string())),
+        }
+        {
+            // <Protocol_Binding>
+            match writer.write(XmlEvent::start_element("taxii_11:Protocol_Binding")) {
+                Ok(_) => (),
+                Err(err) => return Err(MyError(err.to_string())),
+            }
+            match writer.write(XmlEvent::characters(
+                &push_parameters.protocol_binding.as_str(),
+            )) {
+                Ok(_) => (),
+                Err(err) => return Err(MyError(err.to_string())),
+            }
+            // </Protocol_Binding>
+            match writer.write(XmlEvent::end_element()) {
+                Ok(_) => (),
+                Err(err) => return Err(MyError(err.to_string())),
+            }
+        }
+        {
+            // <Address>
+            match writer.write(XmlEvent::start_element("taxii_11:Address")) {
+                Ok(_) => (),
+                Err(err) => return Err(MyError(err.to_string())),
+            }
+            match writer.write(XmlEvent::characters(
+                &push_parameters.protocol_binding.as_str(),
+            )) {
+                Ok(_) => (),
+                Err(err) => return Err(MyError(err.to_string())),
+            }
+            // </Address>
+            match writer.write(XmlEvent::end_element()) {
+                Ok(_) => (),
+                Err(err) => return Err(MyError(err.to_string())),
+            }
+        }
+        {
+            // <Message_Binding>
+            match writer.write(XmlEvent::start_element("taxii_11:Message_Binding")) {
+                Ok(_) => (),
+                Err(err) => return Err(MyError(err.to_string())),
+            }
+            match writer.write(XmlEvent::characters(
+                &push_parameters.protocol_binding.as_str(),
+            )) {
+                Ok(_) => (),
+                Err(err) => return Err(MyError(err.to_string())),
+            }
+            // </Message_Binding>
+            match writer.write(XmlEvent::end_element()) {
+                Ok(_) => (),
+                Err(err) => return Err(MyError(err.to_string())),
+            }
+        }
+        // </Push_Parameters>
+        match writer.write(XmlEvent::end_element()) {
+            Ok(_) => (),
+            Err(err) => return Err(MyError(err.to_string())),
+        }
+    }
+
+    // </Subscription_Management_Request>
+    match writer.write(XmlEvent::end_element()) {
+        Ok(_) => (),
+        Err(err) => return Err(MyError(err.to_string())),
+    }
+    // TODO: better check on conversion than unwrap
+    return Ok(String::from_utf8(buf_writer).unwrap());
+}
+
+fn create_simple_request_body(tag: &str, ver: Version) -> Result<String, MyError> {
     let mut buf_writer: Vec<u8> = Vec::with_capacity(128);
     let mut writer = EmitterConfig::new()
         .write_document_declaration(false)
@@ -106,11 +389,11 @@ pub fn create_request_body(tag: &str, ver: Version) -> Result<String, MyError> {
 }
 
 pub fn create_discovery_request_body(ver: Version) -> Result<String, MyError> {
-    create_request_body("Discovery_Request", ver)
+    create_simple_request_body("Discovery_Request", ver)
 }
 
 pub fn create_collection_information_request_body(ver: Version) -> Result<String, MyError> {
-    create_request_body("Collection_Information_Request", ver)
+    create_simple_request_body("Collection_Information_Request", ver)
 }
 
 // TODO: the generic XML document defclaration fails when talking to test.taxiistand.com -- is
@@ -167,4 +450,33 @@ pub fn collection_information_request(url: &str, username: &str, password: &str,
         Ok(v) => taxii_request(url, username, password, &v, ver),
         Err(err) => panic!("{}", err),
     };
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{create_subscribe_request_body, SubscribeAction, Version};
+
+    #[test]
+    fn test_create_subscribe_request_body() {
+        let result = create_subscribe_request_body(
+            Version::V11,
+            SubscribeAction::Subscribe,
+            "collection-name-1",
+            Some("subscription-id-1"),
+            None,
+            None,
+        );
+        assert!(result.is_err());
+
+        let result = create_subscribe_request_body(
+            Version::V11,
+            SubscribeAction::Subscribe,
+            "collection-name-1",
+            None,
+            None,
+            None,
+        );
+        let result = result.unwrap();
+        println!("result={}", result);
+    }
 }
