@@ -147,6 +147,7 @@ struct PushParameters {
 
 // TODO: Extended Headers?
 // TODO: <ds:Signature>
+
 pub fn write_xml<'a, E>(writer: &mut EventWriter<&mut Vec<u8>>, event: E) -> Result<(), MyError>
 where
     E: Into<XmlEvent<'a>>,
@@ -189,8 +190,12 @@ fn create_subscribe_request_body(
         .attr("message_id", msg_id.as_str())
         .attr("collection_name", collection_name)
         .ns("taxii_11", ver.xml_namespace());
+
+    // <Subscription_Management_Request>
     write_xml(&mut writer, elem)?;
+
     if action != SubscribeAction::Subscribe && subscription_id.is_some() {
+        // <Subscription_ID></Subscription_ID>
         write_xml_tag_with_data(
             &mut writer,
             "taxii_11:Subscription_ID",
@@ -205,170 +210,103 @@ fn create_subscribe_request_body(
 
     if action == SubscribeAction::Subscribe && subscription_parameters.is_some() {
         let subscription_parameters = subscription_parameters.unwrap();
-        match writer.write(XmlEvent::start_element("taxii_11:Subscription_Parameters")) {
-            Ok(_) => (),
-            Err(err) => return Err(MyError(err.to_string())),
-        }
-        {
-            // <Response_Type>
-            match writer.write(XmlEvent::start_element("taxii_11:Response_Type")) {
-                Ok(_) => (),
-                Err(err) => return Err(MyError(err.to_string())),
-            }
-            match writer.write(XmlEvent::characters(
-                subscription_parameters.reponse_type.to_str(),
-            )) {
-                Ok(_) => (),
-                Err(err) => return Err(MyError(err.to_string())),
-            }
-            // </Response_Type>
-            match writer.write(XmlEvent::end_element()) {
-                Ok(_) => (),
-                Err(err) => return Err(MyError(err.to_string())),
-            }
-        }
+        // <Subscription_Parameters>
+        write_xml(
+            &mut writer,
+            XmlEvent::start_element("taxii_11:Subscription_Parameters"),
+        )?;
+        // <Response_Type></Response_Type>
+        write_xml_tag_with_data(
+            &mut writer,
+            "taxii_11:Response_Type",
+            subscription_parameters.reponse_type.to_str(),
+        )?;
         {
             for content_binding in subscription_parameters.content_bindings.iter() {
                 // <Content_Binding>
-                match writer.write(
+                write_xml(
+                    &mut writer,
                     XmlEvent::start_element("taxii_11:Content_Binding")
                         .attr("binding_id", content_binding.binding_id.as_str()),
-                ) {
-                    Ok(_) => (),
-                    Err(err) => return Err(MyError(err.to_string())),
-                }
+                )?;
                 match &content_binding.subtype_id {
                     Some(subtype_id) => {
-                        match writer.write(
+                        write_xml(
+                            &mut writer,
                             XmlEvent::start_element("taxii_11:Subtype")
-                                .attr("subtype_id", subtype_id.as_str()),
-                        ) {
-                            Ok(_) => (),
-                            Err(err) => return Err(MyError(err.to_string())),
-                        }
-                        match writer.write(XmlEvent::end_element()) {
-                            Ok(_) => (),
-                            Err(err) => return Err(MyError(err.to_string())),
-                        }
+                                .attr("binding_id", &subtype_id.as_str()),
+                        )?;
+                        write_xml(&mut writer, XmlEvent::end_element())?;
                     }
                     None => (),
                 }
                 // </Content_Binding>
-                match writer.write(XmlEvent::end_element()) {
-                    Ok(_) => (),
-                    Err(err) => return Err(MyError(err.to_string())),
-                }
+                write_xml(&mut writer, XmlEvent::end_element())?;
             }
             {
                 match &subscription_parameters.query {
                     Some(query) => {
+                        // <Query>
                         match &subscription_parameters.query_format_id {
                             Some(query_format_id) => {
-                                match writer.write(
+                                write_xml(
+                                    &mut writer,
                                     XmlEvent::start_element("taxii_11:Query")
                                         .attr("format_id", query_format_id.as_str()),
-                                ) {
-                                    Ok(_) => (),
-                                    Err(err) => return Err(MyError(err.to_string())),
-                                }
+                                )?;
                             }
-                            None => match writer.write(XmlEvent::start_element("taxii_11:Query")) {
-                                Ok(_) => (),
-                                Err(err) => return Err(MyError(err.to_string())),
-                            },
+                            None => {
+                                write_xml(&mut writer, XmlEvent::start_element("taxii_11:Query"))?
+                            }
                         }
-                        match writer.write(XmlEvent::characters(query.as_str())) {
-                            Ok(_) => (),
-                            Err(err) => return Err(MyError(err.to_string())),
-                        }
-                        match writer.write(XmlEvent::end_element()) {
-                            Ok(_) => (),
-                            Err(err) => return Err(MyError(err.to_string())),
-                        }
+                        write_xml(&mut writer, XmlEvent::characters(query.as_str()))?;
+                        // </Query>
+                        write_xml(&mut writer, XmlEvent::end_element())?;
                     }
                     None => (),
                 }
             }
         }
         // </Subscription_Parameters>
-        match writer.write(XmlEvent::end_element()) {
-            Ok(_) => (),
-            Err(err) => return Err(MyError(err.to_string())),
-        }
+        write_xml(&mut writer, XmlEvent::end_element())?;
     }
     if action == SubscribeAction::Subscribe && push_parameters.is_some() {
         let push_parameters = push_parameters.unwrap();
         // <Push_Parameters>
-        match writer.write(XmlEvent::start_element("taxii_11:Push_Parameters")) {
-            Ok(_) => (),
-            Err(err) => return Err(MyError(err.to_string())),
+        write_xml(
+            &mut writer,
+            XmlEvent::start_element("taxii_11:Push_Parameters"),
+        )?;
+        {
+            // <Protocol_Binding></Protocol_Binding>
+            write_xml_tag_with_data(
+                &mut writer,
+                "taxii_11:Protocol_Binding",
+                &push_parameters.protocol_binding.as_str(),
+            )?;
         }
         {
-            // <Protocol_Binding>
-            match writer.write(XmlEvent::start_element("taxii_11:Protocol_Binding")) {
-                Ok(_) => (),
-                Err(err) => return Err(MyError(err.to_string())),
-            }
-            match writer.write(XmlEvent::characters(
-                &push_parameters.protocol_binding.as_str(),
-            )) {
-                Ok(_) => (),
-                Err(err) => return Err(MyError(err.to_string())),
-            }
-            // </Protocol_Binding>
-            match writer.write(XmlEvent::end_element()) {
-                Ok(_) => (),
-                Err(err) => return Err(MyError(err.to_string())),
-            }
+            // <Address></Address>
+            write_xml_tag_with_data(
+                &mut writer,
+                "taxii_11:Address",
+                &push_parameters.address.as_str(),
+            )?;
         }
         {
-            // <Address>
-            match writer.write(XmlEvent::start_element("taxii_11:Address")) {
-                Ok(_) => (),
-                Err(err) => return Err(MyError(err.to_string())),
-            }
-            match writer.write(XmlEvent::characters(
-                &push_parameters.protocol_binding.as_str(),
-            )) {
-                Ok(_) => (),
-                Err(err) => return Err(MyError(err.to_string())),
-            }
-            // </Address>
-            match writer.write(XmlEvent::end_element()) {
-                Ok(_) => (),
-                Err(err) => return Err(MyError(err.to_string())),
-            }
-        }
-        {
-            // <Message_Binding>
-            match writer.write(XmlEvent::start_element("taxii_11:Message_Binding")) {
-                Ok(_) => (),
-                Err(err) => return Err(MyError(err.to_string())),
-            }
-            match writer.write(XmlEvent::characters(
-                &push_parameters.protocol_binding.as_str(),
-            )) {
-                Ok(_) => (),
-                Err(err) => return Err(MyError(err.to_string())),
-            }
-            // </Message_Binding>
-            match writer.write(XmlEvent::end_element()) {
-                Ok(_) => (),
-                Err(err) => return Err(MyError(err.to_string())),
-            }
+            // <Message_Binding></Message_Binding>
+            write_xml_tag_with_data(
+                &mut writer,
+                "taxii_11:Message_Binding",
+                &push_parameters.message_binding.as_str(),
+            )?;
         }
         // </Push_Parameters>
-        match writer.write(XmlEvent::end_element()) {
-            Ok(_) => (),
-            Err(err) => return Err(MyError(err.to_string())),
-        }
+        write_xml(&mut writer, XmlEvent::end_element())?;
     }
 
     // </Subscription_Management_Request>
-    match writer.write(XmlEvent::end_element()) {
-        Ok(_) => (),
-        Err(err) => return Err(MyError(err.to_string())),
-    }
+    write_xml(&mut writer, XmlEvent::end_element())?;
     // TODO: better check on conversion than unwrap
     return Ok(String::from_utf8(buf_writer).unwrap());
 }
