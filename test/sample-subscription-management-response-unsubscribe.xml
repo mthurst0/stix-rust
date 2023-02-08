@@ -1,0 +1,20 @@
+<taxii_11:Subscription_Management_Response xmlns:taxii="http://taxii.mitre.org/messages/taxii_xml_binding-1" xmlns:taxii_11="http://taxii.mitre.org/messages/taxii_xml_binding-1.1" xmlns:tdq="http://taxii.mitre.org/query/taxii_default_query-1" message_id="3214749113040463214" in_response_to="3135d61d-d990-4706-b394-9b441d4f2d3f" collection_name="stix-data">
+  <taxii_11:Subscription status="UNSUBSCRIBED">
+    <taxii_11:Subscription_ID>8954140241256270840</taxii_11:Subscription_ID>
+    <taxii_11:Subscription_Parameters>
+      <taxii_11:Response_Type>FULL</taxii_11:Response_Type>
+    </taxii_11:Subscription_Parameters>
+    <taxii_11:Poll_Instance>
+      <taxii_11:Protocol_Binding>urn:taxii.mitre.org:protocol:https:1.0</taxii_11:Protocol_Binding>
+      <taxii_11:Address>https://test.taxiistand.com/read-write/services/poll</taxii_11:Address>
+      <taxii_11:Message_Binding>urn:taxii.mitre.org:message:xml:1.0</taxii_11:Message_Binding>
+      <taxii_11:Message_Binding>urn:taxii.mitre.org:message:xml:1.1</taxii_11:Message_Binding>
+    </taxii_11:Poll_Instance>
+    <taxii_11:Poll_Instance>
+      <taxii_11:Protocol_Binding>urn:taxii.mitre.org:protocol:https:1.0</taxii_11:Protocol_Binding>
+      <taxii_11:Address>https://test.taxiistand.com/read-write-auth/services/poll</taxii_11:Address>
+      <taxii_11:Message_Binding>urn:taxii.mitre.org:message:xml:1.0</taxii_11:Message_Binding>
+      <taxii_11:Message_Binding>urn:taxii.mitre.org:message:xml:1.1</taxii_11:Message_Binding>
+    </taxii_11:Poll_Instance>
+  </taxii_11:Subscription>
+</taxii_11:Subscription_Management_Response>

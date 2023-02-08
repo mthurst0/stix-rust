@@ -242,6 +242,27 @@ pub fn subscribe_request(
     }
 }
 
+pub fn unsubscribe_request(
+    url: &str,
+    username: &str,
+    password: &str,
+    ver: Version,
+    collection_name: &str,
+    subscription_id: &str,
+) {
+    match create_subscribe_request_body(
+        ver,
+        SubscribeAction::Unsubscribe,
+        collection_name,
+        Some(subscription_id),
+        None,
+        None,
+    ) {
+        Ok(request_body) => taxii_request(url, username, password, &request_body, ver),
+        Err(err) => panic!("{}", err),
+    }
+}
+
 #[derive(Debug, Copy, Clone, PartialEq)]
 enum SubscriptionManagementResponseTag {
     SubscriptionManagementResponse,
@@ -545,10 +566,10 @@ mod tests {
     }
 
     #[test]
-    fn test_parse_subscription_management_response() {
+    fn test_parse_subscription_management_response_subscribe() {
         let path = env::var("CARGO_MANIFEST_DIR").unwrap();
-        let path =
-            Path::new(path.as_str()).join("test/sample-subscription-management-response.xml");
+        let path = Path::new(path.as_str())
+            .join("test/sample-subscription-management-response-subscribe.xml");
         let doc = read_to_string(path).unwrap();
         let subscription_response = match parse_subscription_management_response(doc.as_bytes()) {
             Ok(v) => v,
@@ -562,6 +583,62 @@ mod tests {
         let sub = subscription_response.subscription;
         assert_eq!("stix-data", sub.collection_name);
         assert_eq!(SubscriptionStatus::Active, sub.status);
+        assert_eq!("8954140241256270840", sub.id);
+        assert_eq!(ResponseType::Full, sub.response_type);
+        assert_eq!(2, sub.poll_instances.len());
+        assert_eq!(
+            "urn:taxii.mitre.org:protocol:https:1.0",
+            sub.poll_instances[0].protocol_binding
+        );
+        assert_eq!(
+            "https://test.taxiistand.com/read-write/services/poll",
+            sub.poll_instances[0].address
+        );
+        assert_eq!(
+            "urn:taxii.mitre.org:message:xml:1.0",
+            sub.poll_instances[0].message_bindings[0]
+        );
+        assert_eq!(
+            "urn:taxii.mitre.org:message:xml:1.1",
+            sub.poll_instances[0].message_bindings[1]
+        );
+
+        assert_eq!(
+            "urn:taxii.mitre.org:protocol:https:1.0",
+            sub.poll_instances[1].protocol_binding
+        );
+        assert_eq!(
+            "https://test.taxiistand.com/read-write-auth/services/poll",
+            sub.poll_instances[1].address
+        );
+        assert_eq!(
+            "urn:taxii.mitre.org:message:xml:1.0",
+            sub.poll_instances[1].message_bindings[0]
+        );
+        assert_eq!(
+            "urn:taxii.mitre.org:message:xml:1.1",
+            sub.poll_instances[1].message_bindings[1]
+        );
+    }
+
+    #[test]
+    fn test_parse_subscription_management_response_unsubscribe() {
+        let path = env::var("CARGO_MANIFEST_DIR").unwrap();
+        let path = Path::new(path.as_str())
+            .join("test/sample-subscription-management-response-unsubscribe.xml");
+        let doc = read_to_string(path).unwrap();
+        let subscription_response = match parse_subscription_management_response(doc.as_bytes()) {
+            Ok(v) => v,
+            Err(err) => panic!("test failed: {}", err),
+        };
+        assert_eq!("3214749113040463214", subscription_response.message_id);
+        assert_eq!(
+            "3135d61d-d990-4706-b394-9b441d4f2d3f",
+            subscription_response.in_response_to
+        );
+        let sub = subscription_response.subscription;
+        assert_eq!("stix-data", sub.collection_name);
+        assert_eq!(SubscriptionStatus::Unsubscribed, sub.status);
         assert_eq!("8954140241256270840", sub.id);
         assert_eq!(ResponseType::Full, sub.response_type);
         assert_eq!(2, sub.poll_instances.len());

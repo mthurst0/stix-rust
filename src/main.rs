@@ -22,13 +22,24 @@ fn main() {
     //     ver,
     // );
 
-    let subscribe_request_url =
+    // let subscribe_request_url =
+    //     "https://test.taxiistand.com/read-write/services/collection-management";
+    // taxii::subscriptions::subscribe_request(
+    //     subscribe_request_url,
+    //     username,
+    //     password,
+    //     ver,
+    //     "stix-data",
+    // );
+
+    let unsubscribe_request_url =
         "https://test.taxiistand.com/read-write/services/collection-management";
-    taxii::subscriptions::subscribe_request(
-        subscribe_request_url,
+    taxii::subscriptions::unsubscribe_request(
+        unsubscribe_request_url,
         username,
         password,
         ver,
         "stix-data",
+        "8954140241256270840",
     );
 }
