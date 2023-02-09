@@ -1,8 +1,10 @@
 #![allow(dead_code)]
 #![allow(unused_variables)]
 
-// TODO: remove the above once we get more stable
+// TODO: remove the ^^ above once we get (more) stable
 // TODO: excessive String cloning in message parsing
+// TODO: logging
+// TODO: uuid test version (prime the UUID generator) -- also for message generation
 
 pub mod taxii;
 

@@ -3,6 +3,8 @@ use reqwest;
 use uuid::Uuid;
 use xml::writer::{EmitterConfig, EventWriter, XmlEvent};
 
+use crate::taxii::files::write_cache_file_with_filestamp;
+
 use super::errors::MyError;
 
 #[derive(Copy, Clone, Debug, PartialEq)]
@@ -165,7 +167,9 @@ pub fn taxii_request(url: &str, username: &str, password: &str, request_body: &s
     match client.execute(request) {
         Ok(resp) => {
             println!("resp={:?}", resp);
-            println!("body={}", resp.text().unwrap())
+            let response_body = resp.text().unwrap();
+            println!("body={}", response_body);
+            _ = write_cache_file_with_filestamp("taxii-response", response_body.as_str());
         }
         Err(err) => panic!("{}", err),
     }

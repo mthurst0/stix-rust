@@ -1,5 +1,6 @@
 pub mod collections;
 pub mod errors;
+pub mod files;
 pub mod poll;
 pub mod services;
 pub mod status_message;
