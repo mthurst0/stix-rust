@@ -1,4 +1,4 @@
-use actix_web::{get, web, App, Error, HttpRequest, HttpResponse, HttpServer, Responder};
+use actix_web::{web, App, Error, HttpRequest, HttpResponse, HttpServer};
 use tracing::info;
 
 /*
@@ -32,12 +32,8 @@ Returns:
     discovery: A Discovery Resource upon successful requests. Additional information
     `here <https://docs.oasis-open.org/cti/taxii/v2.1/cs01/taxii-v2.1-cs01.html#_Toc31107527>`__.
 */
-#[get("/taxii2")]
-async fn discovery(req: HttpRequest) -> HttpResponse {
-    match req.headers().get("accept") {
-        Some(v) => return HttpResponse::Ok().finish(),
-        None => return HttpResponse::BadRequest().finish(),
-    }
+async fn discovery(req: HttpRequest) -> Result<HttpResponse, Error> {
+    Ok(HttpResponse::Ok().finish())
 }
 
 #[derive(Debug)]
@@ -59,7 +55,7 @@ impl ListenAddr {
 pub async fn main() -> std::io::Result<()> {
     let addr = ListenAddr::new("127.0.0.1", 8080);
     info!("listening to: {:?}", addr);
-    HttpServer::new(|| App::new().service(greet))
+    HttpServer::new(|| App::new().service(web::resource("/taxii2").route(web::get().to(discovery))))
         .bind((addr.ip, addr.port))?
         .run()
         .await
@@ -69,20 +65,32 @@ pub async fn main() -> std::io::Result<()> {
 mod tests {
     use actix_web::{body::to_bytes, dev::Service, http, test, web, App, Error};
 
+    use crate::taxii21::middleware;
+
     use super::*;
 
     #[actix_web::test]
     async fn test_discovery() -> Result<(), Error> {
-        let app = App::new().route("/taxii2", web::get().to(discovery));
+        let app = App::new()
+            .wrap(middleware::CheckAcceptHeader)
+            .route("/taxii2", web::get().to(discovery));
         let app = test::init_service(app).await;
 
-        let req = test::TestRequest::get().uri("/").to_request();
+        let req = test::TestRequest::get().uri("/taxii2").to_request();
         let resp = app.call(req).await?;
 
-        assert_eq!(resp.status(), http::StatusCode::OK);
+        assert_eq!(resp.status(), http::StatusCode::BAD_REQUEST);
 
         let response_body = resp.into_body();
-        assert_eq!(to_bytes(response_body).await?, r##"Hello world!"##);
+        assert_eq!(to_bytes(response_body).await?.len(), 0);
+
+        let req = test::TestRequest::get()
+            .uri("/taxii2")
+            .append_header(("Accept", "application/taxii+json;version=2.1"))
+            .to_request();
+
+        let resp = app.call(req).await?;
+        assert_eq!(resp.status(), http::StatusCode::OK);
 
         Ok(())
     }
