@@ -62,10 +62,6 @@ impl AppState {
             Ok(cfg) => cfg,
             Err(err) => return Err(MyError(err.to_string())),
         };
-        // let cfg = match cfg.parse::<toml::Table>() {
-        // Ok(cfg) => cfg,
-        // Err(err) => return Err(MyError(err.to_string())),
-        // };
         let mut app_state = AppState::new_empty();
         app_state.server.title = cfg.taxii2_server.title;
         app_state.server.description = cfg.taxii2_server.description;
@@ -106,7 +102,6 @@ impl ListenAddr {
 
 #[tokio::main]
 pub async fn main() -> std::io::Result<()> {
-    // TODO: load .toml here
     let path = std::env::var("CARGO_MANIFEST_DIR").unwrap();
     let path = std::path::Path::new(path.as_str()).join("test/sample-server.toml");
     let app_state = match AppState::load_toml(path.as_path()) {
@@ -114,7 +109,7 @@ pub async fn main() -> std::io::Result<()> {
         Err(err) => panic!("err={}", err),
     };
     let addr = ListenAddr::new("127.0.0.1", 8080);
-    info!("listening to: {:?}", addr);
+    info!("listening: {}:{}", addr.ip, addr.port);
     HttpServer::new(move || {
         App::new()
             .app_data(web::Data::new(app_state.clone()))
