@@ -1,2 +1,2 @@
-pub mod middleware;
+mod middleware;
 pub mod server;

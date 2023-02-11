@@ -2,29 +2,6 @@ use actix_web::{web, App, Error, HttpRequest, HttpResponse, HttpServer};
 use tracing::info;
 
 /*
-MEDIA_TYPE_TAXII_ANY = "application/taxii+json"
-MEDIA_TYPE_TAXII_V21 = "{media};version=2.1".format(media=MEDIA_TYPE_TAXII_ANY)
-
-
-def validate_version_parameter_in_accept_header():
-    """All endpoints need to check the Accept Header for the correct Media Type"""
-    accept_header = request.headers.get("accept", "").replace(" ", "").split(",")
-    found = False
-
-    for item in accept_header:
-        result = re.match(r"^application/taxii\+json(;version=(\d\.\d))?$", item)
-        if result:
-            if len(result.groups()) >= 1:
-                version_str = result.group(2)
-                if version_str != "2.1":  # The server only supports 2.1
-                    raise ProcessingError("The server does not support version {}".format(version_str), 406)
-            found = True
-            break
-
-    if found is False:
-        raise ProcessingError("Media type in the Accept header is invalid or not found", 406) */
-
-/*
 Defines TAXII API - Server Information:
 Server Discovery section (4.1) `here <https://docs.oasis-open.org/cti/taxii/v2.1/cs01/taxii-v2.1-cs01.html#_Toc31107526>`__
 
@@ -79,7 +56,7 @@ mod tests {
         let req = test::TestRequest::get().uri("/taxii2").to_request();
         let resp = app.call(req).await?;
 
-        assert_eq!(resp.status(), http::StatusCode::BAD_REQUEST);
+        assert_eq!(resp.status(), http::StatusCode::NOT_ACCEPTABLE);
 
         let response_body = resp.into_body();
         assert_eq!(to_bytes(response_body).await?.len(), 0);
@@ -91,6 +68,13 @@ mod tests {
 
         let resp = app.call(req).await?;
         assert_eq!(resp.status(), http::StatusCode::OK);
+
+        let req = test::TestRequest::get()
+            .uri("/taxii2")
+            .append_header(("Accept", "application/taxii+json;version=1.1"))
+            .to_request();
+        let resp = app.call(req).await?;
+        assert_eq!(resp.status(), http::StatusCode::NOT_ACCEPTABLE);
 
         Ok(())
     }

@@ -9,6 +9,8 @@ use actix_web::{
 };
 use futures_util::future::LocalBoxFuture;
 
+static SUPPORTED_TAXII_VERSION: &'static str = "2.1";
+
 pub struct CheckAcceptHeader;
 
 impl<S, B> Transform<S, ServiceRequest> for CheckAcceptHeader
@@ -50,16 +52,20 @@ where
         }
         let valid_accept_header = match request.headers().get("accept") {
             Some(v) => match v.to_str() {
-                // TODO: extract version -- return NotAcceptable if the version isn't what
-                // we expect.
-                Ok(v) => RE.is_match(v),
+                Ok(v) => match RE.captures(v) {
+                    Some(c) => {
+                        let ver = c.get(2).map_or("", |m| m.as_str());
+                        ver == SUPPORTED_TAXII_VERSION
+                    }
+                    None => false,
+                },
                 Err(err) => false,
             },
             None => false,
         };
         if !valid_accept_header {
             let (request, _pl) = request.into_parts();
-            let response = HttpResponse::BadRequest()
+            let response = HttpResponse::NotAcceptable()
                 .finish()
                 // constructed responses map to "right" body
                 .map_into_right_body();
