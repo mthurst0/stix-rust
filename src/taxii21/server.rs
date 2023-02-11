@@ -1,13 +1,17 @@
+use std::path::Path;
+
 use crate::taxii21::middleware;
 use actix_web::{web, App, Error, HttpRequest, HttpResponse, HttpServer};
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use tracing::info;
+
+use super::errors::MyError;
 
 #[derive(Clone, Serialize)]
 pub struct Server {
     title: String,
-    description: String,
-    contact: String,
+    description: Option<String>,
+    contact: Option<String>,
     default: String,
     api_roots: Vec<String>,
 }
@@ -16,12 +20,26 @@ impl Server {
     pub fn new_empty() -> Server {
         return Server {
             title: String::new(),
-            description: String::new(),
-            contact: String::new(),
+            description: None,
+            contact: None,
             default: String::new(),
             api_roots: Vec::<String>::new(),
         };
     }
+}
+
+#[derive(Deserialize, Serialize)]
+pub struct Taxii2ServerConfig {
+    title: String,
+    description: Option<String>,
+    contact: Option<String>,
+    default: String,
+    api_roots: Vec<String>,
+}
+
+#[derive(Deserialize, Serialize)]
+pub struct AppConfig {
+    taxii2_server: Taxii2ServerConfig,
 }
 
 #[derive(Clone)]
@@ -35,19 +53,28 @@ impl AppState {
             server: Server::new_empty(),
         };
     }
+    pub fn load_toml(path: &Path) -> Result<AppState, MyError> {
+        let cfg = match std::fs::read_to_string(path) {
+            Ok(cfg) => cfg,
+            Err(err) => return Err(MyError(err.to_string())),
+        };
+        let cfg: AppConfig = match toml::from_str(cfg.as_str()) {
+            Ok(cfg) => cfg,
+            Err(err) => return Err(MyError(err.to_string())),
+        };
+        // let cfg = match cfg.parse::<toml::Table>() {
+        // Ok(cfg) => cfg,
+        // Err(err) => return Err(MyError(err.to_string())),
+        // };
+        let mut app_state = AppState::new_empty();
+        app_state.server.title = cfg.taxii2_server.title;
+        app_state.server.description = cfg.taxii2_server.description;
+        app_state.server.contact = cfg.taxii2_server.contact;
+        app_state.server.default = cfg.taxii2_server.default;
+        app_state.server.api_roots = cfg.taxii2_server.api_roots;
+        Ok(app_state)
+    }
 }
-
-/*
-"title": "Some TAXII Server",
-"description": "This TAXII Server contains a listing of",
-"contact": "string containing contact information",
-"default": "http://localhost:5000/trustgroup1/",
-"api_roots": [
-    "http://localhost:5000/api1/",
-    "http://localhost:5000/api2/",
-    "http://localhost:5000/trustgroup1/"
-]
-*/
 
 /*
 Defines TAXII API - Server Information:
@@ -79,7 +106,13 @@ impl ListenAddr {
 
 #[tokio::main]
 pub async fn main() -> std::io::Result<()> {
-    let app_state = AppState::new_empty();
+    // TODO: load .toml here
+    let path = std::env::var("CARGO_MANIFEST_DIR").unwrap();
+    let path = std::path::Path::new(path.as_str()).join("test/sample-server.toml");
+    let app_state = match AppState::load_toml(path.as_path()) {
+        Ok(app_state) => app_state,
+        Err(err) => panic!("err={}", err),
+    };
     let addr = ListenAddr::new("127.0.0.1", 8080);
     info!("listening to: {:?}", addr);
     HttpServer::new(move || {

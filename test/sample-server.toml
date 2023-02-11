@@ -1,0 +1,9 @@
+[taxii2_server]
+title = "Sample Server Title"
+description  = "Sample Server Description"
+contact = "Sample Server Contact"
+default = "https://example.com/api1"
+api_roots = [
+    "https://example.com/api1",
+    "https://example.com/api2"
+]
