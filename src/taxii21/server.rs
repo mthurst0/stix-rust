@@ -1,7 +1,7 @@
 use std::path::Path;
 
 use crate::taxii21::middleware;
-use actix_web::{web, App, Error, HttpRequest, HttpResponse, HttpServer};
+use actix_web::{http::header, web, App, Error, HttpRequest, HttpResponse, HttpServer};
 use serde::{Deserialize, Serialize};
 use tracing::info;
 
@@ -72,6 +72,8 @@ impl AppState {
     }
 }
 
+const CONTENT_TYPE_TAXII2: &'static str = "application/taxii+json;version=2.1";
+
 /*
 Defines TAXII API - Server Information:
 Server Discovery section (4.1) `here <https://docs.oasis-open.org/cti/taxii/v2.1/cs01/taxii-v2.1-cs01.html#_Toc31107526>`__
@@ -82,7 +84,9 @@ Returns:
 */
 async fn discovery(app_data: web::Data<AppState>, req: HttpRequest) -> Result<HttpResponse, Error> {
     let server = &app_data.server;
-    Ok(HttpResponse::Ok().json(web::Json(server)))
+    Ok(HttpResponse::Ok()
+        .append_header(("Content-Type", CONTENT_TYPE_TAXII2))
+        .json(web::Json(server)))
 }
 
 #[derive(Debug)]
