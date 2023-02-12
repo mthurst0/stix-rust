@@ -1,9 +1,14 @@
-use std::{collections::HashMap, path::Path};
+use std::{collections::HashMap, path::Path, sync::Arc};
 
 use crate::taxii21::middleware;
-use actix_web::{web, App, Error, HttpRequest, HttpResponse, HttpServer};
+use actix_web::{
+    body::{BoxBody, EitherBody},
+    dev::{ServiceFactory, ServiceRequest, ServiceResponse},
+    web, App, Error, HttpRequest, HttpResponse, HttpServer,
+};
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
+use std::sync::Mutex;
 use tracing::info;
 
 use super::errors::MyError;
@@ -140,9 +145,14 @@ pub struct AppConfig {
 }
 
 #[derive(Clone)]
+struct AppStateWrapper {
+    app_state: Arc<Mutex<AppState>>,
+}
+
+#[derive(Clone)]
 struct AppState {
-    server: Discovery,
-    api_roots: HashMap<String, APIRoot>,
+    pub server: Discovery,
+    pub api_roots: HashMap<String, APIRoot>,
 }
 
 impl AppState {
@@ -182,10 +192,11 @@ Returns:
     `here <https://docs.oasis-open.org/cti/taxii/v2.1/cs01/taxii-v2.1-cs01.html#_Toc31107527>`__.
 */
 async fn handle_discovery(
-    app_data: web::Data<AppState>,
+    wrapper: web::Data<AppStateWrapper>,
     req: HttpRequest,
 ) -> Result<HttpResponse, Error> {
-    let server = &app_data.server;
+    let app_state = wrapper.app_state.lock().unwrap();
+    let server = &app_state.server;
     Ok(HttpResponse::Ok()
         .append_header(("Content-Type", CONTENT_TYPE_TAXII2))
         .json(web::Json(server)))
@@ -197,11 +208,12 @@ struct APIRootPath {
 }
 
 async fn handle_api_root(
-    app_data: web::Data<AppState>,
+    wrapper: web::Data<AppStateWrapper>,
     path: web::Path<APIRootPath>,
     req: HttpRequest,
 ) -> Result<HttpResponse, Error> {
-    let api_root = match app_data.api_roots.get(&path.api_root) {
+    let app_state = wrapper.app_state.lock().unwrap();
+    let api_root = match app_state.api_roots.get(&path.api_root) {
         Some(v) => v,
         None => return Ok(HttpResponse::NotFound().finish()),
     };
@@ -225,6 +237,25 @@ impl ListenAddr {
     }
 }
 
+fn new_app(
+    app_state: Arc<Mutex<AppState>>,
+) -> actix_web::App<
+    impl ServiceFactory<
+        ServiceRequest,
+        Config = (),
+        Response = ServiceResponse<EitherBody<BoxBody>>,
+        Error = actix_web::Error,
+        InitError = (),
+    >,
+> {
+    let wrapper = AppStateWrapper { app_state };
+    return App::new()
+        .app_data(web::Data::new(wrapper.clone()))
+        .wrap(middleware::CheckAcceptHeader)
+        .service(web::resource("/taxii2").route(web::get().to(handle_discovery)))
+        .service(web::resource("/{api_root}/").route(web::get().to(handle_api_root)));
+}
+
 #[tokio::main]
 pub async fn main() -> std::io::Result<()> {
     let path = std::env::var("CARGO_MANIFEST_DIR").unwrap();
@@ -233,35 +264,27 @@ pub async fn main() -> std::io::Result<()> {
         Ok(app_state) => app_state,
         Err(err) => panic!("err={}", err),
     };
+    let app_state = Arc::new(Mutex::new(app_state));
     let addr = ListenAddr::new("127.0.0.1", 8080);
     info!("listening: {}:{}", addr.ip, addr.port);
-    HttpServer::new(move || {
-        App::new()
-            .app_data(web::Data::new(app_state.clone()))
-            .wrap(middleware::CheckAcceptHeader)
-            .service(web::resource("/taxii2").route(web::get().to(handle_discovery)))
-            .service(web::resource("/{api_root}/").route(web::get().to(handle_api_root)))
-    })
-    .bind((addr.ip, addr.port))?
-    .run()
-    .await
+    HttpServer::new(move || new_app(app_state.clone()))
+        .bind((addr.ip, addr.port))?
+        .run()
+        .await
 }
 
 #[cfg(test)]
 mod tests {
-    use actix_web::{body::to_bytes, dev::Service, http, test, web, App, Error};
+    use std::sync::Arc;
 
-    use crate::taxii21::middleware;
+    use actix_web::{body::to_bytes, dev::Service, http, test, Error};
 
     use super::*;
 
     #[actix_web::test]
     async fn test_discovery() -> Result<(), Error> {
-        let app_state = AppState::new_empty();
-        let app = App::new()
-            .app_data(web::Data::new(app_state.clone()))
-            .wrap(middleware::CheckAcceptHeader)
-            .service(web::resource("/taxii2").route(web::get().to(handle_discovery)));
+        let app_state = Arc::new(Mutex::new(AppState::new_empty()));
+        let app = new_app(app_state.clone());
         let app = test::init_service(app).await;
 
         let req = test::TestRequest::get().uri("/taxii2").to_request();
@@ -293,11 +316,8 @@ mod tests {
 
     #[actix_web::test]
     async fn test_handle_api_root_errors() -> Result<(), Error> {
-        let app_state = AppState::new_empty();
-        let app = App::new()
-            .app_data(web::Data::new(app_state.clone()))
-            .wrap(middleware::CheckAcceptHeader)
-            .service(web::resource("/{api_root}/").route(web::get().to(handle_api_root)));
+        let app_state = Arc::new(Mutex::new(AppState::new_empty()));
+        let app = new_app(app_state.clone());
         let app = test::init_service(app).await;
 
         let req = test::TestRequest::get()
@@ -318,29 +338,21 @@ mod tests {
         assert_eq!(resp.status(), http::StatusCode::NOT_FOUND);
         let response_body = resp.into_body();
         assert_eq!(to_bytes(response_body).await?.len(), 0);
-        Ok(())
-    }
 
-    #[actix_web::test]
-    async fn test_handle_api_root() -> Result<(), Error> {
-        let mut app_state = AppState::new_empty();
         let mut versions = Vec::<String>::new();
         versions.push(String::from("api-root-version"));
-        app_state.api_roots.insert(
-            String::from("api_root1"),
-            APIRoot::new(
-                "api-root-title",
-                Some("api-root-description"),
-                &versions,
-                1000,
-            ),
-        );
-
-        let app = App::new()
-            .app_data(web::Data::new(app_state.clone()))
-            .wrap(middleware::CheckAcceptHeader)
-            .service(web::resource("/{api_root}/").route(web::get().to(handle_api_root)));
-        let app = test::init_service(app).await;
+        {
+            let mut app_state = app_state.lock().unwrap();
+            app_state.api_roots.insert(
+                String::from("api_root1"),
+                APIRoot::new(
+                    "api-root-title",
+                    Some("api-root-description"),
+                    &versions,
+                    1000,
+                ),
+            );
+        }
 
         let req = test::TestRequest::get()
             .uri("/api_root1/")
@@ -355,6 +367,19 @@ mod tests {
             Ok(v) => v,
             Err(err) => panic!("err={}", err),
         };
+
+        {
+            let mut app_state = app_state.lock().unwrap();
+            app_state.api_roots.remove(&String::from("api_root1"));
+        }
+
+        let req = test::TestRequest::get()
+            .uri("/api_root1/")
+            .append_header(("Accept", "application/taxii+json;version=2.1"))
+            .to_request();
+        let resp = app.call(req).await?;
+        assert_eq!(resp.status(), http::StatusCode::NOT_FOUND);
+
         Ok(())
     }
 }
