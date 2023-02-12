@@ -5,6 +5,8 @@
 // TODO: excessive String cloning in message parsing
 // TODO: logging
 // TODO: uuid test version (prime the UUID generator) -- also for message generation
+// TODO: test the json serialization of an empty Collections object
+// TODO: authentication
 
 pub mod taxii;
 pub mod taxii21;

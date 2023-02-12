@@ -1,31 +1,128 @@
-use std::path::Path;
+use std::{collections::HashMap, path::Path};
 
 use crate::taxii21::middleware;
-use actix_web::{http::header, web, App, Error, HttpRequest, HttpResponse, HttpServer};
+use actix_web::{web, App, Error, HttpRequest, HttpResponse, HttpServer};
+use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use tracing::info;
 
 use super::errors::MyError;
 
 #[derive(Clone, Serialize)]
-pub struct Server {
+pub struct Discovery {
     title: String,
     description: Option<String>,
     contact: Option<String>,
-    default: String,
-    api_roots: Vec<String>,
+    default: Option<String>,
+    api_roots: Option<Vec<String>>,
 }
 
-impl Server {
-    pub fn new_empty() -> Server {
-        return Server {
+impl Discovery {
+    pub fn new_empty() -> Discovery {
+        return Discovery {
             title: String::new(),
             description: None,
             contact: None,
-            default: String::new(),
-            api_roots: Vec::<String>::new(),
+            default: None,
+            api_roots: None,
         };
     }
+}
+
+#[derive(Clone, Deserialize, Serialize)]
+pub struct APIRoot {
+    title: String,
+    description: Option<String>,
+    versions: Vec<String>,
+    max_content_length: u64,
+}
+
+impl APIRoot {
+    pub fn new(
+        title: &str,
+        description: Option<&str>,
+        versions: &Vec<String>,
+        max_content_length: u64,
+    ) -> APIRoot {
+        return APIRoot {
+            title: String::from(title),
+            description: match description {
+                Some(v) => Some(String::from(v)),
+                None => None,
+            },
+            versions: versions.clone(),
+            max_content_length,
+        };
+    }
+}
+
+#[derive(Clone, Serialize)]
+pub struct StatusDetails {
+    id: String,
+    version: String,
+    message: Option<String>,
+}
+
+#[derive(Clone, Serialize)]
+pub struct Status {
+    id: String,
+    status: String, // TODO: StatusEnum
+    request_timestamp: Option<DateTime<Utc>>,
+    total_count: u32,
+    success_count: u32,
+    successes: Option<Vec<StatusDetails>>,
+    failure_count: u32,
+    failures: Option<Vec<StatusDetails>>,
+    pending_count: u32,
+    pendings: Option<Vec<StatusDetails>>,
+}
+
+#[derive(Clone, Serialize)]
+pub struct Object {
+    created: Option<DateTime<Utc>>,
+    description: String,
+    id: String,
+    indicator_types: Vec<String>,
+    is_family: bool,
+    malware_types: Vec<String>,
+    modified: Option<DateTime<Utc>>,
+    name: String,
+    pattern: String,
+    pattern_type: String, // TODO: enum
+    spec_version: String,
+    #[serde(rename(serialize = "type", deserialize = "type"))]
+    typ: String,
+    valid_from: Option<DateTime<Utc>>,
+}
+
+#[derive(Clone, Serialize)]
+pub struct Collections {
+    collections: Option<Vec<Collection>>,
+}
+
+#[derive(Clone, Serialize)]
+pub struct Collection {
+    id: String,
+    title: String,
+    description: Option<String>,
+    alias: Option<String>,
+    can_read: bool,
+    can_write: bool,
+    media_types: Option<Vec<String>>,
+}
+
+#[derive(Clone, Serialize)]
+pub struct Manifest {
+    more: Option<bool>,
+    objects: Option<Vec<ManifestRecord>>,
+}
+
+#[derive(Clone, Serialize)]
+pub struct ManifestRecord {
+    id: String,
+    date_added: chrono::DateTime<Utc>,
+    version: String,
+    media_type: Option<String>,
 }
 
 #[derive(Deserialize, Serialize)]
@@ -44,13 +141,15 @@ pub struct AppConfig {
 
 #[derive(Clone)]
 struct AppState {
-    server: Server,
+    server: Discovery,
+    api_roots: HashMap<String, APIRoot>,
 }
 
 impl AppState {
     pub fn new_empty() -> AppState {
         return AppState {
-            server: Server::new_empty(),
+            server: Discovery::new_empty(),
+            api_roots: HashMap::<String, APIRoot>::new(),
         };
     }
     pub fn load_toml(path: &Path) -> Result<AppState, MyError> {
@@ -66,8 +165,8 @@ impl AppState {
         app_state.server.title = cfg.taxii2_server.title;
         app_state.server.description = cfg.taxii2_server.description;
         app_state.server.contact = cfg.taxii2_server.contact;
-        app_state.server.default = cfg.taxii2_server.default;
-        app_state.server.api_roots = cfg.taxii2_server.api_roots;
+        app_state.server.default = Some(cfg.taxii2_server.default);
+        app_state.server.api_roots = Some(cfg.taxii2_server.api_roots);
         Ok(app_state)
     }
 }
@@ -82,11 +181,33 @@ Returns:
     discovery: A Discovery Resource upon successful requests. Additional information
     `here <https://docs.oasis-open.org/cti/taxii/v2.1/cs01/taxii-v2.1-cs01.html#_Toc31107527>`__.
 */
-async fn discovery(app_data: web::Data<AppState>, req: HttpRequest) -> Result<HttpResponse, Error> {
+async fn handle_discovery(
+    app_data: web::Data<AppState>,
+    req: HttpRequest,
+) -> Result<HttpResponse, Error> {
     let server = &app_data.server;
     Ok(HttpResponse::Ok()
         .append_header(("Content-Type", CONTENT_TYPE_TAXII2))
         .json(web::Json(server)))
+}
+
+#[derive(Deserialize)]
+struct APIRootPath {
+    api_root: String,
+}
+
+async fn handle_api_root(
+    app_data: web::Data<AppState>,
+    path: web::Path<APIRootPath>,
+    req: HttpRequest,
+) -> Result<HttpResponse, Error> {
+    let api_root = match app_data.api_roots.get(&path.api_root) {
+        Some(v) => v,
+        None => return Ok(HttpResponse::NotFound().finish()),
+    };
+    Ok(HttpResponse::Ok()
+        .append_header(("Content-Type", CONTENT_TYPE_TAXII2))
+        .json(web::Json(api_root)))
 }
 
 #[derive(Debug)]
@@ -118,7 +239,8 @@ pub async fn main() -> std::io::Result<()> {
         App::new()
             .app_data(web::Data::new(app_state.clone()))
             .wrap(middleware::CheckAcceptHeader)
-            .service(web::resource("/taxii2").route(web::get().to(discovery)))
+            .service(web::resource("/taxii2").route(web::get().to(handle_discovery)))
+            .service(web::resource("/{api_root}/").route(web::get().to(handle_api_root)))
     })
     .bind((addr.ip, addr.port))?
     .run()
@@ -139,7 +261,7 @@ mod tests {
         let app = App::new()
             .app_data(web::Data::new(app_state.clone()))
             .wrap(middleware::CheckAcceptHeader)
-            .service(web::resource("/taxii2").route(web::get().to(discovery)));
+            .service(web::resource("/taxii2").route(web::get().to(handle_discovery)));
         let app = test::init_service(app).await;
 
         let req = test::TestRequest::get().uri("/taxii2").to_request();
@@ -154,6 +276,10 @@ mod tests {
             .to_request();
         let resp = app.call(req).await?;
         assert_eq!(resp.status(), http::StatusCode::OK);
+        assert_eq!(
+            "application/taxii+json;version=2.1",
+            resp.headers().get("Content-Type").unwrap()
+        );
 
         let req = test::TestRequest::get()
             .uri("/taxii2")
@@ -162,6 +288,73 @@ mod tests {
         let resp = app.call(req).await?;
         assert_eq!(resp.status(), http::StatusCode::NOT_ACCEPTABLE);
 
+        Ok(())
+    }
+
+    #[actix_web::test]
+    async fn test_handle_api_root_errors() -> Result<(), Error> {
+        let app_state = AppState::new_empty();
+        let app = App::new()
+            .app_data(web::Data::new(app_state.clone()))
+            .wrap(middleware::CheckAcceptHeader)
+            .service(web::resource("/{api_root}/").route(web::get().to(handle_api_root)));
+        let app = test::init_service(app).await;
+
+        let req = test::TestRequest::get()
+            .uri("/not-found/")
+            .append_header(("Accept", "application/taxii+json;version=2.1"))
+            .to_request();
+        let resp = app.call(req).await?;
+        assert_eq!(resp.status(), http::StatusCode::NOT_FOUND);
+        let response_body = resp.into_body();
+        assert_eq!(to_bytes(response_body).await?.len(), 0);
+
+        // TODO: test what happens with the OASIS implementation when accessing this URL
+        let req = test::TestRequest::get()
+            .uri("/taxii2/")
+            .append_header(("Accept", "application/taxii+json;version=2.1"))
+            .to_request();
+        let resp = app.call(req).await?;
+        assert_eq!(resp.status(), http::StatusCode::NOT_FOUND);
+        let response_body = resp.into_body();
+        assert_eq!(to_bytes(response_body).await?.len(), 0);
+        Ok(())
+    }
+
+    #[actix_web::test]
+    async fn test_handle_api_root() -> Result<(), Error> {
+        let mut app_state = AppState::new_empty();
+        let mut versions = Vec::<String>::new();
+        versions.push(String::from("api-root-version"));
+        app_state.api_roots.insert(
+            String::from("api_root1"),
+            APIRoot::new(
+                "api-root-title",
+                Some("api-root-description"),
+                &versions,
+                1000,
+            ),
+        );
+
+        let app = App::new()
+            .app_data(web::Data::new(app_state.clone()))
+            .wrap(middleware::CheckAcceptHeader)
+            .service(web::resource("/{api_root}/").route(web::get().to(handle_api_root)));
+        let app = test::init_service(app).await;
+
+        let req = test::TestRequest::get()
+            .uri("/api_root1/")
+            .append_header(("Accept", "application/taxii+json;version=2.1"))
+            .to_request();
+        let resp = app.call(req).await?;
+        assert_eq!(resp.status(), http::StatusCode::OK);
+        let response_body = resp.into_body();
+        let response_body = to_bytes(response_body).await?;
+        assert!(response_body.len() > 0);
+        let api_root: APIRoot = match serde_json::from_slice::<APIRoot>(response_body.as_ref()) {
+            Ok(v) => v,
+            Err(err) => panic!("err={}", err),
+        };
         Ok(())
     }
 }
