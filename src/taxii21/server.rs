@@ -64,6 +64,7 @@ impl APIRootConfig {
 #[derive(Clone)]
 pub struct APIRoot {
     config: APIRootConfig,
+    api_root_server_record_limit: Option<u32>,
     statii: HashMap<String, Status>,
     collections: Collections,
 }
@@ -72,6 +73,7 @@ impl APIRoot {
     pub fn new(config: &APIRootConfig) -> APIRoot {
         return APIRoot {
             config: config.clone(),
+            api_root_server_record_limit: None,
             statii: HashMap::<String, Status>::new(),
             collections: Collections::new(),
         };
@@ -79,7 +81,7 @@ impl APIRoot {
     pub fn add_status(&mut self, status: &Status) {
         self.statii.insert(status.id.clone(), status.clone());
     }
-    pub fn add_collection(&mut self, collection: &Collection) {
+    pub fn add_collection(&mut self, collection: &CollectionConfig) {
         self.collections.add_collection(collection);
     }
 }
@@ -122,7 +124,7 @@ impl Status {
     }
 }
 
-#[derive(Clone, Serialize)]
+#[derive(Clone, Deserialize, Serialize)]
 pub struct Object {
     created: Option<DateTime<Utc>>,
     description: String,
@@ -142,24 +144,24 @@ pub struct Object {
 
 #[derive(Clone, Deserialize, Serialize)]
 pub struct Collections {
-    collections: Option<Vec<Collection>>,
+    collections: Option<Vec<CollectionConfig>>,
 }
 
 impl Collections {
     pub fn new() -> Collections {
         return Collections { collections: None };
     }
-    pub fn add_collection(&mut self, collection: &Collection) {
+    pub fn add_collection(&mut self, collection: &CollectionConfig) {
         match &mut self.collections {
             Some(collections) => collections.push(collection.clone()),
             None => {
-                let mut new_collections = Vec::<Collection>::new();
+                let mut new_collections = Vec::<CollectionConfig>::new();
                 new_collections.push(collection.clone());
                 self.collections = Some(new_collections);
             }
         }
     }
-    pub fn get_collection(&self, id: &str) -> Option<&Collection> {
+    pub fn get_collection(&self, id: &str) -> Option<&CollectionConfig> {
         match &self.collections {
             Some(collections) => {
                 for (pos, collection) in collections.iter().enumerate() {
@@ -174,8 +176,23 @@ impl Collections {
     }
 }
 
-#[derive(Clone, Deserialize, Serialize)]
+#[derive(Clone)]
 pub struct Collection {
+    pub config: CollectionConfig,
+    pub manifests: Vec<ManifestRecord>,
+}
+
+impl Collection {
+    pub fn new(id: &str, title: &str) -> Collection {
+        return Collection {
+            config: CollectionConfig::new(id, title),
+            manifests: Vec::<ManifestRecord>::new(),
+        };
+    }
+}
+
+#[derive(Clone, Deserialize, Serialize)]
+pub struct CollectionConfig {
     id: String,
     title: String,
     description: Option<String>,
@@ -185,9 +202,9 @@ pub struct Collection {
     media_types: Option<Vec<String>>,
 }
 
-impl Collection {
-    pub fn new(id: &str, title: &str) -> Collection {
-        return Collection {
+impl CollectionConfig {
+    pub fn new(id: &str, title: &str) -> CollectionConfig {
+        return CollectionConfig {
             id: String::from(id),
             title: String::from(title),
             description: None,
@@ -205,7 +222,7 @@ pub struct Manifest {
     objects: Option<Vec<ManifestRecord>>,
 }
 
-#[derive(Clone, Serialize)]
+#[derive(Clone, Deserialize, Serialize)]
 pub struct ManifestRecord {
     id: String,
     date_added: chrono::DateTime<Utc>,
@@ -235,13 +252,17 @@ struct AppStateWrapper {
 #[derive(Clone)]
 struct AppState {
     pub server: Discovery,
+    pub default_server_record_limit: u32,
     pub api_roots: HashMap<String, APIRoot>,
 }
+
+const DEFAULT_SERVER_LIMIT: u32 = 100;
 
 impl AppState {
     pub fn new_empty() -> AppState {
         return AppState {
             server: Discovery::new_empty(),
+            default_server_record_limit: DEFAULT_SERVER_LIMIT,
             api_roots: HashMap::<String, APIRoot>::new(),
         };
     }
@@ -284,7 +305,7 @@ impl AppState {
     pub fn add_collection(
         &mut self,
         api_root: &str,
-        collection: &Collection,
+        collection: &CollectionConfig,
     ) -> Result<(), MyError> {
         let api_root = match self.api_roots.get_mut(api_root) {
             Some(v) => v,
@@ -305,14 +326,6 @@ impl AppState {
 
 const CONTENT_TYPE_TAXII2: &'static str = "application/taxii+json;version=2.1";
 
-/*
-Defines TAXII API - Server Information:
-Server Discovery section (4.1) `here <https://docs.oasis-open.org/cti/taxii/v2.1/cs01/taxii-v2.1-cs01.html#_Toc31107526>`__
-
-Returns:
-    discovery: A Discovery Resource upon successful requests. Additional information
-    `here <https://docs.oasis-open.org/cti/taxii/v2.1/cs01/taxii-v2.1-cs01.html#_Toc31107527>`__.
-*/
 async fn handle_discovery(
     wrapper: web::Data<AppStateWrapper>,
     req: HttpRequest,
@@ -403,6 +416,20 @@ async fn handle_api_root_collection(
     Ok(HttpResponse::Ok()
         .append_header(("Content-Type", CONTENT_TYPE_TAXII2))
         .json(web::Json(collection)))
+}
+
+async fn handle_api_root_collection_manifests(
+    wrapper: web::Data<AppStateWrapper>,
+    path: web::Path<APIRootCollectionPath>,
+    req: HttpRequest,
+) -> Result<HttpResponse, Error> {
+    // TODO
+    Ok(HttpResponse::NotFound().finish())
+    // let app_state = wrapper.app_state.lock().unwrap();
+    // let collections = match app_state.get_collections(path.api_root.as_str()) {
+    //     Some(v) => v,
+    //     None => return Ok(HttpResponse::NotFound().finish()),
+    // };
 }
 
 #[derive(Debug)]
@@ -676,7 +703,7 @@ mod tests {
 
         {
             let mut app_state = app_state.lock().unwrap();
-            let collection = Collection::new("collection-id", "collection-title");
+            let collection = CollectionConfig::new("collection-id", "collection-title");
             match app_state.add_collection("api_root1", &collection) {
                 Ok(_) => (),
                 Err(err) => panic!("err={}", err),
@@ -735,7 +762,7 @@ mod tests {
 
         {
             let mut app_state = app_state.lock().unwrap();
-            let collection = Collection::new("test-collection-id", "test-collection-title");
+            let collection = CollectionConfig::new("test-collection-id", "test-collection-title");
             match app_state.add_collection("api_root1", &collection) {
                 Ok(_) => (),
                 Err(err) => panic!("err={}", err),
@@ -749,8 +776,8 @@ mod tests {
         assert_eq!(resp.status(), http::StatusCode::OK);
         let response_body = to_bytes(resp.into_body()).await?;
         assert!(response_body.len() > 0);
-        let collection: Collection =
-            match serde_json::from_slice::<Collection>(response_body.as_ref()) {
+        let collection: CollectionConfig =
+            match serde_json::from_slice::<CollectionConfig>(response_body.as_ref()) {
                 Ok(v) => v,
                 Err(err) => panic!("err={}", err),
             };

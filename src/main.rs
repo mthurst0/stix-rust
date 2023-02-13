@@ -7,6 +7,9 @@
 // TODO: uuid test version (prime the UUID generator) -- also for message generation
 // TODO: test the json serialization of an empty Collections object
 // TODO: authentication
+// TODO: TAXII HTTP headers:
+// X-TAXII-Date-Added-First: timestamp
+// X-TAXII-Date-Added-Last: timestamp
 
 pub mod taxii;
 pub mod taxii21;
