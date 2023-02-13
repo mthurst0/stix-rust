@@ -35,21 +35,21 @@ impl Discovery {
 }
 
 #[derive(Clone, Deserialize, Serialize)]
-pub struct APIRoot {
+pub struct APIRootConfig {
     title: String,
     description: Option<String>,
     versions: Vec<String>,
     max_content_length: u64,
 }
 
-impl APIRoot {
+impl APIRootConfig {
     pub fn new(
         title: &str,
         description: Option<&str>,
         versions: &Vec<String>,
         max_content_length: u64,
-    ) -> APIRoot {
-        return APIRoot {
+    ) -> APIRootConfig {
+        return APIRootConfig {
             title: String::from(title),
             description: match description {
                 Some(v) => Some(String::from(v)),
@@ -61,14 +61,32 @@ impl APIRoot {
     }
 }
 
-#[derive(Clone, Serialize)]
+#[derive(Clone)]
+pub struct APIRoot {
+    config: APIRootConfig,
+    statii: HashMap<String, Status>,
+}
+
+impl APIRoot {
+    pub fn new(config: &APIRootConfig) -> APIRoot {
+        return APIRoot {
+            config: config.clone(),
+            statii: HashMap::<String, Status>::new(),
+        };
+    }
+    pub fn add_status(&mut self, status: &Status) {
+        self.statii.insert(status.id.clone(), status.clone());
+    }
+}
+
+#[derive(Clone, Deserialize, Serialize)]
 pub struct StatusDetails {
     id: String,
     version: String,
     message: Option<String>,
 }
 
-#[derive(Clone, Serialize)]
+#[derive(Clone, Deserialize, Serialize)]
 pub struct Status {
     id: String,
     status: String, // TODO: StatusEnum
@@ -80,6 +98,23 @@ pub struct Status {
     failures: Option<Vec<StatusDetails>>,
     pending_count: u32,
     pendings: Option<Vec<StatusDetails>>,
+}
+
+impl Status {
+    pub fn new(id: &str) -> Status {
+        return Status {
+            id: String::from(id),
+            status: String::from(""),
+            request_timestamp: None,
+            total_count: 0,
+            success_count: 0,
+            successes: None,
+            failure_count: 0,
+            failures: None,
+            pending_count: 0,
+            pendings: None,
+        };
+    }
 }
 
 #[derive(Clone, Serialize)]
@@ -179,6 +214,25 @@ impl AppState {
         app_state.server.api_roots = Some(cfg.taxii2_server.api_roots);
         Ok(app_state)
     }
+    pub fn get_status(&self, api_root: &str, status_id: &str) -> Option<Status> {
+        match self.api_roots.get(api_root) {
+            Some(api_root) => match api_root.statii.get(status_id) {
+                Some(status) => return Some(status.clone()),
+                None => return None,
+            },
+            None => return None,
+        };
+    }
+    pub fn add_status(&mut self, api_root: &str, status: &Status) -> Result<(), MyError> {
+        let api_root = match self.api_roots.get_mut(api_root) {
+            Some(v) => v,
+            // TODO: errors -- e.g. "Not Found"
+            // TODO: see actix_web examples
+            None => return Err(MyError(format!("could not find api_root={}", api_root))),
+        };
+        api_root.add_status(status);
+        Ok(())
+    }
 }
 
 const CONTENT_TYPE_TAXII2: &'static str = "application/taxii+json;version=2.1";
@@ -213,13 +267,34 @@ async fn handle_api_root(
     req: HttpRequest,
 ) -> Result<HttpResponse, Error> {
     let app_state = wrapper.app_state.lock().unwrap();
-    let api_root = match app_state.api_roots.get(&path.api_root) {
+    let config = match app_state.api_roots.get(&path.api_root) {
+        Some(v) => v.config.clone(),
+        None => return Ok(HttpResponse::NotFound().finish()),
+    };
+    Ok(HttpResponse::Ok()
+        .append_header(("Content-Type", CONTENT_TYPE_TAXII2))
+        .json(web::Json(config)))
+}
+
+#[derive(Deserialize)]
+struct APIRootStatusPath {
+    api_root: String,
+    status_id: String,
+}
+
+async fn handle_api_root_status(
+    wrapper: web::Data<AppStateWrapper>,
+    path: web::Path<APIRootStatusPath>,
+    req: HttpRequest,
+) -> Result<HttpResponse, Error> {
+    let app_state = wrapper.app_state.lock().unwrap();
+    let status = match app_state.get_status(path.api_root.as_str(), path.status_id.as_str()) {
         Some(v) => v,
         None => return Ok(HttpResponse::NotFound().finish()),
     };
     Ok(HttpResponse::Ok()
         .append_header(("Content-Type", CONTENT_TYPE_TAXII2))
-        .json(web::Json(api_root)))
+        .json(web::Json(status)))
 }
 
 #[derive(Debug)]
@@ -253,7 +328,11 @@ fn new_app(
         .app_data(web::Data::new(wrapper.clone()))
         .wrap(middleware::CheckAcceptHeader)
         .service(web::resource("/taxii2").route(web::get().to(handle_discovery)))
-        .service(web::resource("/{api_root}/").route(web::get().to(handle_api_root)));
+        .service(web::resource("/{api_root}/").route(web::get().to(handle_api_root)))
+        .service(
+            web::resource("/{api_root}/status/{status_id}/")
+                .route(web::get().to(handle_api_root_status)),
+        );
 }
 
 #[tokio::main]
@@ -345,12 +424,12 @@ mod tests {
             let mut app_state = app_state.lock().unwrap();
             app_state.api_roots.insert(
                 String::from("api_root1"),
-                APIRoot::new(
+                APIRoot::new(&APIRootConfig::new(
                     "api-root-title",
                     Some("api-root-description"),
                     &versions,
                     1000,
-                ),
+                )),
             );
         }
 
@@ -363,10 +442,15 @@ mod tests {
         let response_body = resp.into_body();
         let response_body = to_bytes(response_body).await?;
         assert!(response_body.len() > 0);
-        let api_root: APIRoot = match serde_json::from_slice::<APIRoot>(response_body.as_ref()) {
-            Ok(v) => v,
-            Err(err) => panic!("err={}", err),
-        };
+        let api_root: APIRootConfig =
+            match serde_json::from_slice::<APIRootConfig>(response_body.as_ref()) {
+                Ok(v) => v,
+                Err(err) => panic!("err={}", err),
+            };
+        assert_eq!("api-root-title", api_root.title);
+        assert_eq!("api-root-description", api_root.description.unwrap());
+        assert_eq!("api-root-version", api_root.versions[0]);
+        assert_eq!(1000, api_root.max_content_length);
 
         {
             let mut app_state = app_state.lock().unwrap();
@@ -379,6 +463,63 @@ mod tests {
             .to_request();
         let resp = app.call(req).await?;
         assert_eq!(resp.status(), http::StatusCode::NOT_FOUND);
+
+        Ok(())
+    }
+
+    #[actix_web::test]
+    async fn test_handle_api_root_status() -> Result<(), Error> {
+        let app_state = Arc::new(Mutex::new(AppState::new_empty()));
+        let app = new_app(app_state.clone());
+        let app = test::init_service(app).await;
+        let mut versions = Vec::<String>::new();
+        versions.push(String::from("api-root-version"));
+        {
+            let mut app_state = app_state.lock().unwrap();
+            app_state.api_roots.insert(
+                String::from("api_root1"),
+                APIRoot::new(&APIRootConfig::new(
+                    "api-root-title",
+                    Some("api-root-description"),
+                    &versions,
+                    1000,
+                )),
+            );
+        }
+        let req = test::TestRequest::get()
+            .uri("/api_root1/")
+            .append_header(("Accept", "application/taxii+json;version=2.1"))
+            .to_request();
+        let resp = app.call(req).await?;
+        assert_eq!(resp.status(), http::StatusCode::OK);
+
+        let req = test::TestRequest::get()
+            .uri("/api_root1/status/test-status-id")
+            .append_header(("Accept", "application/taxii+json;version=2.1"))
+            .to_request();
+        let resp = app.call(req).await?;
+        assert_eq!(resp.status(), http::StatusCode::NOT_FOUND);
+        {
+            let mut app_state = app_state.lock().unwrap();
+            let mut status = Status::new("test-status-id");
+            status.status = String::from("SUCCESS");
+            app_state.add_status("api_root1", &status).unwrap();
+        }
+
+        let req = test::TestRequest::get()
+            .uri("/api_root1/status/test-status-id/")
+            .append_header(("Accept", "application/taxii+json;version=2.1"))
+            .to_request();
+        let resp = app.call(req).await?;
+        assert_eq!(resp.status(), http::StatusCode::OK);
+        let response_body = to_bytes(resp.into_body()).await?;
+        assert!(response_body.len() > 0);
+        let status: Status = match serde_json::from_slice::<Status>(response_body.as_ref()) {
+            Ok(v) => v,
+            Err(err) => panic!("err={}", err),
+        };
+        assert_eq!("test-status-id", status.id);
+        assert_eq!("SUCCESS", status.status);
 
         Ok(())
     }
