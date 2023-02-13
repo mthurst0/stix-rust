@@ -159,6 +159,19 @@ impl Collections {
             }
         }
     }
+    pub fn get_collection(&self, id: &str) -> Option<&Collection> {
+        match &self.collections {
+            Some(collections) => {
+                for (pos, collection) in collections.iter().enumerate() {
+                    if collection.id == id {
+                        return Some(&collections[pos]);
+                    }
+                }
+                None
+            }
+            None => None,
+        }
+    }
 }
 
 #[derive(Clone, Deserialize, Serialize)]
@@ -367,6 +380,31 @@ async fn handle_api_root_collections(
         .json(web::Json(collections)))
 }
 
+#[derive(Deserialize)]
+struct APIRootCollectionPath {
+    api_root: String,
+    collection_id: String,
+}
+
+async fn handle_api_root_collection(
+    wrapper: web::Data<AppStateWrapper>,
+    path: web::Path<APIRootCollectionPath>,
+    req: HttpRequest,
+) -> Result<HttpResponse, Error> {
+    let app_state = wrapper.app_state.lock().unwrap();
+    let collections = match app_state.get_collections(path.api_root.as_str()) {
+        Some(v) => v,
+        None => return Ok(HttpResponse::NotFound().finish()),
+    };
+    let collection = match collections.get_collection(path.collection_id.as_str()) {
+        Some(v) => v,
+        None => return Ok(HttpResponse::NotFound().finish()),
+    };
+    Ok(HttpResponse::Ok()
+        .append_header(("Content-Type", CONTENT_TYPE_TAXII2))
+        .json(web::Json(collection)))
+}
+
 #[derive(Debug)]
 pub struct ListenAddr {
     ip: String,
@@ -406,6 +444,10 @@ fn new_app(
         .service(
             web::resource("/{api_root}/collections/")
                 .route(web::get().to(handle_api_root_collections)),
+        )
+        .service(
+            web::resource("/{api_root}/collections/{collection_id}/")
+                .route(web::get().to(handle_api_root_collection)),
         );
 }
 
@@ -661,6 +703,59 @@ mod tests {
             }
             None => panic!("expected one collection"),
         }
+
+        Ok(())
+    }
+
+    #[actix_web::test]
+    async fn test_handle_api_root_collection() -> Result<(), Error> {
+        let app_state = Arc::new(Mutex::new(AppState::new_empty()));
+        let app = new_app(app_state.clone());
+        let app = test::init_service(app).await;
+        let mut versions = Vec::<String>::new();
+        versions.push(String::from("api-root-version"));
+        {
+            let mut app_state = app_state.lock().unwrap();
+            app_state.api_roots.insert(
+                String::from("api_root1"),
+                APIRoot::new(&APIRootConfig::new(
+                    "api-root-title",
+                    Some("api-root-description"),
+                    &versions,
+                    1000,
+                )),
+            );
+        }
+        let req = test::TestRequest::get()
+            .uri("/api_root1/collections/test-collection-id/")
+            .append_header(("Accept", "application/taxii+json;version=2.1"))
+            .to_request();
+        let resp = app.call(req).await?;
+        assert_eq!(resp.status(), http::StatusCode::NOT_FOUND);
+
+        {
+            let mut app_state = app_state.lock().unwrap();
+            let collection = Collection::new("test-collection-id", "test-collection-title");
+            match app_state.add_collection("api_root1", &collection) {
+                Ok(_) => (),
+                Err(err) => panic!("err={}", err),
+            }
+        }
+        let req = test::TestRequest::get()
+            .uri("/api_root1/collections/test-collection-id/")
+            .append_header(("Accept", "application/taxii+json;version=2.1"))
+            .to_request();
+        let resp = app.call(req).await?;
+        assert_eq!(resp.status(), http::StatusCode::OK);
+        let response_body = to_bytes(resp.into_body()).await?;
+        assert!(response_body.len() > 0);
+        let collection: Collection =
+            match serde_json::from_slice::<Collection>(response_body.as_ref()) {
+                Ok(v) => v,
+                Err(err) => panic!("err={}", err),
+            };
+        assert_eq!("test-collection-id", collection.id);
+        assert_eq!("test-collection-title", collection.title);
 
         Ok(())
     }
