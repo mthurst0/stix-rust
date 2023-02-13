@@ -65,6 +65,7 @@ impl APIRootConfig {
 pub struct APIRoot {
     config: APIRootConfig,
     statii: HashMap<String, Status>,
+    collections: Collections,
 }
 
 impl APIRoot {
@@ -72,10 +73,14 @@ impl APIRoot {
         return APIRoot {
             config: config.clone(),
             statii: HashMap::<String, Status>::new(),
+            collections: Collections::new(),
         };
     }
     pub fn add_status(&mut self, status: &Status) {
         self.statii.insert(status.id.clone(), status.clone());
+    }
+    pub fn add_collection(&mut self, collection: &Collection) {
+        self.collections.add_collection(collection);
     }
 }
 
@@ -135,12 +140,28 @@ pub struct Object {
     valid_from: Option<DateTime<Utc>>,
 }
 
-#[derive(Clone, Serialize)]
+#[derive(Clone, Deserialize, Serialize)]
 pub struct Collections {
     collections: Option<Vec<Collection>>,
 }
 
-#[derive(Clone, Serialize)]
+impl Collections {
+    pub fn new() -> Collections {
+        return Collections { collections: None };
+    }
+    pub fn add_collection(&mut self, collection: &Collection) {
+        match &mut self.collections {
+            Some(collections) => collections.push(collection.clone()),
+            None => {
+                let mut new_collections = Vec::<Collection>::new();
+                new_collections.push(collection.clone());
+                self.collections = Some(new_collections);
+            }
+        }
+    }
+}
+
+#[derive(Clone, Deserialize, Serialize)]
 pub struct Collection {
     id: String,
     title: String,
@@ -149,6 +170,20 @@ pub struct Collection {
     can_read: bool,
     can_write: bool,
     media_types: Option<Vec<String>>,
+}
+
+impl Collection {
+    pub fn new(id: &str, title: &str) -> Collection {
+        return Collection {
+            id: String::from(id),
+            title: String::from(title),
+            description: None,
+            alias: None,
+            can_read: false,
+            can_write: false,
+            media_types: None,
+        };
+    }
 }
 
 #[derive(Clone, Serialize)]
@@ -214,15 +249,6 @@ impl AppState {
         app_state.server.api_roots = Some(cfg.taxii2_server.api_roots);
         Ok(app_state)
     }
-    pub fn get_status(&self, api_root: &str, status_id: &str) -> Option<Status> {
-        match self.api_roots.get(api_root) {
-            Some(api_root) => match api_root.statii.get(status_id) {
-                Some(status) => return Some(status.clone()),
-                None => return None,
-            },
-            None => return None,
-        };
-    }
     pub fn add_status(&mut self, api_root: &str, status: &Status) -> Result<(), MyError> {
         let api_root = match self.api_roots.get_mut(api_root) {
             Some(v) => v,
@@ -232,6 +258,35 @@ impl AppState {
         };
         api_root.add_status(status);
         Ok(())
+    }
+    pub fn get_status(&self, api_root: &str, status_id: &str) -> Option<Status> {
+        match self.api_roots.get(api_root) {
+            Some(api_root) => match api_root.statii.get(status_id) {
+                Some(status) => return Some(status.clone()),
+                None => return None,
+            },
+            None => return None,
+        };
+    }
+    pub fn add_collection(
+        &mut self,
+        api_root: &str,
+        collection: &Collection,
+    ) -> Result<(), MyError> {
+        let api_root = match self.api_roots.get_mut(api_root) {
+            Some(v) => v,
+            // TODO: errors -- e.g. "Not Found"
+            // TODO: see actix_web examples
+            None => return Err(MyError(format!("could not find api_root={}", api_root))),
+        };
+        api_root.add_collection(collection);
+        Ok(())
+    }
+    pub fn get_collections(&self, api_root: &str) -> Option<&Collections> {
+        match self.api_roots.get(api_root) {
+            Some(api_root) => return Some(&api_root.collections),
+            None => return None,
+        };
     }
 }
 
@@ -297,6 +352,21 @@ async fn handle_api_root_status(
         .json(web::Json(status)))
 }
 
+async fn handle_api_root_collections(
+    wrapper: web::Data<AppStateWrapper>,
+    path: web::Path<APIRootPath>,
+    req: HttpRequest,
+) -> Result<HttpResponse, Error> {
+    let app_state = wrapper.app_state.lock().unwrap();
+    let collections = match app_state.get_collections(path.api_root.as_str()) {
+        Some(v) => v,
+        None => return Ok(HttpResponse::NotFound().finish()),
+    };
+    Ok(HttpResponse::Ok()
+        .append_header(("Content-Type", CONTENT_TYPE_TAXII2))
+        .json(web::Json(collections)))
+}
+
 #[derive(Debug)]
 pub struct ListenAddr {
     ip: String,
@@ -332,6 +402,10 @@ fn new_app(
         .service(
             web::resource("/{api_root}/status/{status_id}/")
                 .route(web::get().to(handle_api_root_status)),
+        )
+        .service(
+            web::resource("/{api_root}/collections/")
+                .route(web::get().to(handle_api_root_collections)),
         );
 }
 
@@ -520,6 +594,73 @@ mod tests {
         };
         assert_eq!("test-status-id", status.id);
         assert_eq!("SUCCESS", status.status);
+
+        Ok(())
+    }
+
+    #[actix_web::test]
+    async fn test_handle_api_root_collections() -> Result<(), Error> {
+        let app_state = Arc::new(Mutex::new(AppState::new_empty()));
+        let app = new_app(app_state.clone());
+        let app = test::init_service(app).await;
+        let mut versions = Vec::<String>::new();
+        versions.push(String::from("api-root-version"));
+        {
+            let mut app_state = app_state.lock().unwrap();
+            app_state.api_roots.insert(
+                String::from("api_root1"),
+                APIRoot::new(&APIRootConfig::new(
+                    "api-root-title",
+                    Some("api-root-description"),
+                    &versions,
+                    1000,
+                )),
+            );
+        }
+        let req = test::TestRequest::get()
+            .uri("/api_root1/collections/")
+            .append_header(("Accept", "application/taxii+json;version=2.1"))
+            .to_request();
+        let resp = app.call(req).await?;
+        assert_eq!(resp.status(), http::StatusCode::OK);
+        let response_body = to_bytes(resp.into_body()).await?;
+        assert!(response_body.len() > 0);
+        let collections: Collections =
+            match serde_json::from_slice::<Collections>(response_body.as_ref()) {
+                Ok(v) => v,
+                Err(err) => panic!("err={}", err),
+            };
+        assert!(collections.collections.is_none());
+
+        {
+            let mut app_state = app_state.lock().unwrap();
+            let collection = Collection::new("collection-id", "collection-title");
+            match app_state.add_collection("api_root1", &collection) {
+                Ok(_) => (),
+                Err(err) => panic!("err={}", err),
+            }
+        }
+        let req = test::TestRequest::get()
+            .uri("/api_root1/collections/")
+            .append_header(("Accept", "application/taxii+json;version=2.1"))
+            .to_request();
+        let resp = app.call(req).await?;
+        assert_eq!(resp.status(), http::StatusCode::OK);
+        let response_body = to_bytes(resp.into_body()).await?;
+        assert!(response_body.len() > 0);
+        let collections: Collections =
+            match serde_json::from_slice::<Collections>(response_body.as_ref()) {
+                Ok(v) => v,
+                Err(err) => panic!("err={}", err),
+            };
+        match collections.collections {
+            Some(collections) => {
+                assert_eq!(1, collections.len());
+                assert_eq!("collection-id", collections[0].id);
+                assert_eq!("collection-title", collections[0].title);
+            }
+            None => panic!("expected one collection"),
+        }
 
         Ok(())
     }
