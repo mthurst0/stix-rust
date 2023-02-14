@@ -11,7 +11,11 @@ use serde::{Deserialize, Serialize};
 use std::sync::Mutex;
 use tracing::info;
 
-use super::errors::MyError;
+use super::{
+    backend::{Backend, Filtering},
+    errors::MyError,
+    file_backend::FileBackend,
+};
 
 #[derive(Clone, Serialize)]
 pub struct Discovery {
@@ -216,10 +220,19 @@ impl CollectionConfig {
     }
 }
 
-#[derive(Clone, Serialize)]
+#[derive(Clone, Deserialize, Serialize)]
 pub struct Manifest {
     more: Option<bool>,
     objects: Option<Vec<ManifestRecord>>,
+}
+
+impl Manifest {
+    pub fn new() -> Manifest {
+        return Manifest {
+            more: None,
+            objects: None,
+        };
+    }
 }
 
 #[derive(Clone, Deserialize, Serialize)]
@@ -254,6 +267,7 @@ struct AppState {
     pub server: Discovery,
     pub default_server_record_limit: u32,
     pub api_roots: HashMap<String, APIRoot>,
+    pub backend: Option<Arc<Mutex<dyn Backend + Send>>>,
 }
 
 const DEFAULT_SERVER_LIMIT: u32 = 100;
@@ -264,7 +278,13 @@ impl AppState {
             server: Discovery::new_empty(),
             default_server_record_limit: DEFAULT_SERVER_LIMIT,
             api_roots: HashMap::<String, APIRoot>::new(),
+            backend: None,
         };
+    }
+    pub fn add_file_backend(&mut self, root_dir: &str) {
+        let backend = FileBackend::new(root_dir);
+        let backend = Arc::new(Mutex::new(backend));
+        self.backend = Some(backend);
     }
     pub fn load_toml(path: &Path) -> Result<AppState, MyError> {
         let cfg = match std::fs::read_to_string(path) {
@@ -281,6 +301,9 @@ impl AppState {
         app_state.server.contact = cfg.taxii2_server.contact;
         app_state.server.default = Some(cfg.taxii2_server.default);
         app_state.server.api_roots = Some(cfg.taxii2_server.api_roots);
+        let root_dir = std::env::var("CARGO_MANIFEST_DIR").unwrap();
+        let root_dir = format!("{}/test/file-backend/", root_dir);
+        app_state.add_file_backend(root_dir.as_str());
         Ok(app_state)
     }
     pub fn add_status(&mut self, api_root: &str, status: &Status) -> Result<(), MyError> {
@@ -423,13 +446,24 @@ async fn handle_api_root_collection_manifests(
     path: web::Path<APIRootCollectionPath>,
     req: HttpRequest,
 ) -> Result<HttpResponse, Error> {
-    // TODO
-    Ok(HttpResponse::NotFound().finish())
-    // let app_state = wrapper.app_state.lock().unwrap();
-    // let collections = match app_state.get_collections(path.api_root.as_str()) {
-    //     Some(v) => v,
-    //     None => return Ok(HttpResponse::NotFound().finish()),
-    // };
+    let app_state = wrapper.app_state.lock().unwrap();
+    let backend = match &app_state.backend {
+        Some(v) => v,
+        None => return Ok(HttpResponse::InternalServerError().finish()),
+    };
+    let backend = backend.lock().unwrap();
+    match backend.get_manifests(path.collection_id.as_str(), &Filtering::no_filter()) {
+        Ok(v) => {
+            let mut result = Manifest::new();
+            if v.len() > 0 {
+                result.objects = Some(v);
+            }
+            return Ok(HttpResponse::Ok()
+                .append_header(("Content-Type", CONTENT_TYPE_TAXII2))
+                .json(web::Json(result)));
+        }
+        Err(err) => return Ok(HttpResponse::NotFound().finish()),
+    }
 }
 
 #[derive(Debug)]
@@ -475,6 +509,10 @@ fn new_app(
         .service(
             web::resource("/{api_root}/collections/{collection_id}/")
                 .route(web::get().to(handle_api_root_collection)),
+        )
+        .service(
+            web::resource("/{api_root}/collections/{collection_id}/manifest/")
+                .route(web::get().to(handle_api_root_collection_manifests)),
         );
 }
 
@@ -784,6 +822,45 @@ mod tests {
         assert_eq!("test-collection-id", collection.id);
         assert_eq!("test-collection-title", collection.title);
 
+        Ok(())
+    }
+
+    #[actix_web::test]
+    async fn test_handle_api_root_collection_manifest() -> Result<(), Error> {
+        let mut app_state = AppState::new_empty();
+        let root_dir = std::env::var("HOME").unwrap();
+        let root_dir = format!("{}/rk/stix-rust/test/file-backend/", root_dir);
+        app_state.add_file_backend(root_dir.as_str());
+        let app_state = Arc::new(Mutex::new(app_state));
+        let app = new_app(app_state.clone());
+        let app = test::init_service(app).await;
+        let mut versions = Vec::<String>::new();
+        versions.push(String::from("api-root-version"));
+        {
+            let mut app_state = app_state.lock().unwrap();
+            app_state.api_roots.insert(
+                String::from("api_root1"),
+                APIRoot::new(&APIRootConfig::new(
+                    "api-root-title",
+                    Some("api-root-description"),
+                    &versions,
+                    1000,
+                )),
+            );
+        }
+        let req = test::TestRequest::get()
+            .uri("/api_root1/collections/aaaabbbb/manifest/")
+            .append_header(("Accept", "application/taxii+json;version=2.1"))
+            .to_request();
+        let resp = app.call(req).await?;
+        assert_eq!(resp.status(), http::StatusCode::OK);
+        let response_body = to_bytes(resp.into_body()).await?;
+        assert!(response_body.len() > 0);
+        let manifest: Manifest = match serde_json::from_slice::<Manifest>(response_body.as_ref()) {
+            Ok(v) => v,
+            Err(err) => panic!("err={}", err),
+        };
+        assert!(manifest.objects.is_none());
         Ok(())
     }
 }

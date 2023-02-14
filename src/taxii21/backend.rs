@@ -14,10 +14,21 @@ pub struct Match {
 }
 
 pub struct Filtering {
-    added_after: chrono::DateTime<chrono::Utc>,
+    added_after: Option<chrono::DateTime<chrono::Utc>>,
     limit: u32,
     next: String,
     matches: Vec<Match>,
+}
+
+impl Filtering {
+    pub fn no_filter() -> Filtering {
+        return Filtering {
+            added_after: None,
+            limit: 0,
+            next: String::from(""),
+            matches: Vec::<Match>::new(),
+        };
+    }
 }
 
 pub trait Backend {

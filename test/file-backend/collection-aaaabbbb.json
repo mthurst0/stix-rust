@@ -1,0 +1,13 @@
+{
+    "config": {
+        "id": "aaaabbbb",
+        "title": "This data collection is for testing querying across collections",
+        "can_read": false,
+        "can_write": true,
+        "media_types": [
+            "application/stix+json;version=2.1"
+        ]
+    },
+    "objects": [],
+    "manifest": []
+}
